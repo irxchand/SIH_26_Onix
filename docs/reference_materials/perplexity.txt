@@ -1,0 +1,649 @@
+Research Dossier: SIH26139
+Bottom line: TB detection from chest X-rays is a credible demonstrator for SIH26139, but “segmentation → deep features → dimensionality reduction → QML classifier → explanation” is not itself demonstrably novel. The strongest defensible opportunity is a rigorous evaluation of whether anatomically constrained preprocessing improves the robustness, calibration, low-data behavior, and external generalization of small-qubit QML—not a claim that QML is clinically superior.
+
+The immediate SIH project should be framed as a hybrid clinical-AI research platform, with TB-CXR as the first module. The longer-term paper should focus on a controlled evidence question: when, if ever, does a low-qubit quantum model add measurable value after clinically meaningful feature engineering?
+
+1. SIH26139: verified scope
+The most authoritative publicly discoverable source currently available is the SIH 2026 problem-statement catalogue identifying SIH26139, Software track, sponsored by Egreen Quanta, under MedTech / BioTech / HealthTech. Its exact published title is:
+
+“Hybrid Quantum Machine Learning Platform for Early Disease Detection.”
+
+Important limitation
+The publicly indexed catalogue provides the title, sponsor, theme, and track, but does not expose a detailed official background, description, required datasets, evaluation rubric, attachments, or technology constraints for SIH26139. Therefore, claims that SIH officially mandates particular components—such as QSVM, QNN, VQC, segmentation, explainability, or particular metrics—cannot be verified from the authoritative public material retrieved here.
+
+Treat the following as a project interpretation aligned with the title, not as a quotation of SIH requirements. Before final submission, obtain the full statement directly from the authenticated SIH portal or your institutional SPOC and preserve screenshots/PDF copies.
+
+Verified SIH information	What it supports	What it does not establish
+SIH26139 is a Software problem statement	A deployable software workflow, UI, data pipeline, and demonstrable inference are appropriate	A requirement for a specific quantum SDK, hardware, or deployment stack
+Title includes “Hybrid Quantum Machine Learning”	A genuine classical-plus-quantum pipeline is central	That a quantum model must beat a classical model
+Title includes “Platform”	Modular architecture, ingestion, training/inference, benchmarking, and reporting are sensible	That a full clinical product or hospital integration is expected
+Title includes “Early Disease Detection”	A screening/triage framing is suitable	A diagnostic or regulatory claim
+Sponsor is Egreen Quanta	Quantum methodology and technically credible QML implementation matter	That any particular disease or modality has been prescribed
+Theme is MedTech / BioTech / HealthTech	Clinical safety, explainability, data governance, and limitations matter	That the prototype is a medical device
+Requirement-to-system mapping
+SIH Requirement / verified wording	Proposed system component	Evidence / reason
+“Hybrid Quantum Machine Learning”	Classical CXR preprocessing and feature extraction + low-qubit QSVM/VQC module	A hybrid architecture is directly consistent with the problem title. 
+“Platform”	Dataset ingestion, preprocessing, model registry, training, inference, benchmarking dashboard, evidence report	A platform implies more than a single notebook classifier.
+“Early Disease Detection”	TB screening/triage probability, uncertainty flag, and “not for diagnosis” warning	CXR-based TB screening is clinically meaningful, but outputs must be framed as decision support.
+MedTech / BioTech / HealthTech	Explainability, uncertainty, patient-level split discipline, and dataset provenance display	Health AI requires stronger evidence and safety framing than generic image classification.
+Not publicly specified	Lung segmentation	Include as an experimentally testable anatomical prior, not as an SIH-mandated feature.
+Not publicly specified	QNN, VQC, QSVM	Present one or two methods as concrete QML implementations—not as imposed by SIH.
+Not publicly specified	Quantum hardware execution	Include only as an optional reproducibility/noise demonstration if feasible. Do not imply a hardware requirement.
+2. Egreen Quanta alignment
+Egreen Quanta’s own quantum-computing/ML page emphasizes projects including “Quantum Gate based on QNN for stem cell discovery,” “Quantum Reinforcement Learning for Implementing Ion Trapped Quantum Gates,” “Quantum Machine Learning Methods for Improving Flood Prediction Models,” and several ion-trap, quantum-gate, and optimization concepts.
+
+This is meaningful, but it is important not to overstate the evidence: the retrieved company page is a project-listing page, not a peer-reviewed publication record, audited clinical portfolio, patent database, or detailed hardware-capability statement.
+
+What appears aligned
+Egreen Quanta signal	Implication for your pitch
+QNN for stem-cell discovery	They appear receptive to QNN-style quantum learning applied to life-science problems. 
+Quantum ML for flood prediction	They appear interested in applied QML, not only quantum theory. 
+Ion-trap and gate-level projects	Circuit design, qubit efficiency, encoding choice, and NISQ realism are likely more persuasive than generic AI claims. 
+Multiple “quantum-inspired” SIH problems from the same sponsor	Carefully distinguish actual gate-based QML from quantum-inspired classical optimization. SIH26139 explicitly says hybrid quantum ML, whereas other Egreen statements explicitly say quantum-inspired. 
+Strong alignment
+Your strongest sponsor-aligned positioning is:
+
+“We are not inserting a quantum layer for branding. We reduce clinically relevant CXR features to a qubit-feasible representation, compare a quantum kernel/VQC with matched classical models, test segmentation as an anatomical prior, and report uncertainty, external validation, and resource cost.”
+
+This aligns with their visible interests in QNNs, practical QML, quantum gates, and life-science applications.
+
+Generic quantum buzzwords to avoid
+Do not say:
+
+“Quantum computing processes all chest X-ray pixels in parallel.”
+
+“Quantum automatically gives exponential speed-up.”
+
+“Quantum guarantees higher diagnostic accuracy.”
+
+“The superposition of X-ray features detects TB better.”
+
+“Our model is quantum-secure, therefore medically reliable.”
+
+“QML replaces radiologists.”
+
+“Quantum advantage” unless you demonstrate a carefully defined advantage under matched resource accounting.
+
+A major 2025 systematic review found no consistent evidence that QML outperforms classical approaches in digital health; of 4,915 screened studies, only 16 met its synthesis criteria, and only a minority evaluated realistic noisy or hardware conditions. This is not a weakness for your project—it is precisely why a careful benchmark study is scientifically worthwhile.
+
+3. Literature position
+Established evidence
+Classical TB-CXR AI is mature enough to be a serious benchmark domain. Shenzhen has 662 PA CXRs—336 TB and 326 normal—and Montgomery has 138 PA CXRs—58 TB and 80 normal.
+
+TBX11K materially improves the scale of TB-CXR work. It contains 11,200 CXRs, with TB-area bounding-box annotations and categories including healthy, sick-but-non-TB, active TB, latent TB, and uncertain TB.
+
+QML health evidence remains immature. The best systematic evidence concludes that performance differences between QML and classical models in digital health are inconsistent, often poorly benchmarked, and not enough to establish empirical quantum utility.
+
+Low-dimensional preprocessing is standard for near-term QML. QML must encode classical data, and encoding cost is a central bottleneck. Angle encoding requires 
+O
+(
+d
+)
+O(d) qubits for 
+d
+d input features; amplitude encoding can reduce qubit count but generally has nontrivial state-preparation cost.
+
+Segmentation and localization are not synonymous. TBX11K supports lesion-region bounding boxes, not dense lesion masks as the primary public annotation form. Lung masks are available or can be generated for some classic TB collections, but lesion segmentation requires a separately justified dataset and annotation strategy.
+
+Emerging evidence
+QML has been used for medical-image classification, generally via classical feature extraction followed by low-dimensional quantum kernels or variational circuits.
+
+Small circuits, simulators, idealized noise-free evaluations, and weak baseline matching remain common limitations.
+
+A reported TB quanvolutional/QCNN study exists, with 87% validation accuracy, so a generic “QML for TB CXR” claim would not be novel. However, the surfaced source is not sufficient to treat it as strong peer-reviewed evidence.
+
+There is limited high-rigor evidence specifically combining TB CXR, explicit lung segmentation ablation, feature-reduction ablation, matched classical baselines, external dataset testing, calibration, and realistic QML resource reporting.
+
+The paper-level question
+A publishable research question is not:
+
+“Can QML detect TB from chest X-rays?”
+
+It is:
+
+“Does lung-field restriction improve the reliability and data efficiency of low-qubit quantum-kernel or variational classifiers based on fixed deep radiographic embeddings, relative to matched classical classifiers, under internal and external TB-CXR evaluation?”
+
+That question can produce a valuable paper even if the answer is “no.”
+
+4. Gap matrix
+Capability	Existing literature	Evidence	Strength	Remaining gap
+TB + CXR	Extensive classical literature	Shenzhen, Montgomery, TBX11K and many deep-learning studies exist. 
+Strong	Not a novelty claim
+Lung segmentation	Widely used in classical CXR pipelines	Public TB datasets and CXR segmentation work exist	Strong	Need controlled testing of its effect on QML
+Lesion localization	TBX11K provides TB bounding boxes	1,211 TB-region boxes are reported; most are small. 
+Moderate–strong	Dense lesion segmentation and QML integration are limited
+Classical deep learning	DenseNet/EfficientNet and related models are established	Many TB-CXR studies use transfer learning	Strong	Need matched, leakage-safe baselines
+QML in health	Numerous papers, weak aggregate evidence	Systematic review found no consistent benefit. 
+Strong	Better experimental rigor
+TB + QML	A small number of claims/studies exist	Surfaced hybrid QCNN work; quality uncertain. 
+Weak–moderate	Reproducible, external, statistically rigorous evaluation
+Segmentation + QML	Few visible high-quality disease-imaging studies	No strong study identified in this focused search for TB lung segmentation + controlled QML ablation	Limited	Direct test of anatomical preprocessing as a QML-enabling prior
+Lesion localization + QML	Sparse	No high-quality TB-CXR evidence identified here	Limited	ROI-vs-lung-vs-whole-image quantum-feature comparison
+QML + explainability	Underdeveloped and methodologically difficult	Most QML health work lacks robust interpretability assessment. 
+Moderate	Separate classical image explanation from quantum-feature attribution
+QML + uncertainty	Limited	QML output sampling is probabilistic but does not equal calibrated clinical uncertainty	Moderate	Calibration, abstention, OOD uncertainty
+QML + cross-dataset validation	Rare in health QML	Review notes limited diversity and weak robustness characterization. 
+Moderate	Train one TB source, test another
+QML + low-data evaluation	Common claim, limited rigorous proof	Existing evidence does not establish consistent advantage. 
+Moderate	Learning curves with repeated sampled subsets
+Domain shift	Established problem in classical medical AI	Different hospitals, scanners, populations	Strong	QML-specific evaluation is limited
+Clinically grounded reasoning	Mostly absent in QML imaging	Many QML pipelines use generic compressed features	Moderate	Lung-field restriction, localization agreement, explanation sanity checks
+External validation	Possible with Shenzhen ↔ Montgomery and TBX11K splits	Distinct sources exist. 
+Strong	Make it mandatory in study design
+Real quantum hardware	Rare and noise-sensitive	Only 16/169 eligible studies considered realistic conditions in review. 
+Strong	Small hardware-reproducibility subset, not full-scale training
+Computational efficiency benchmarking	Usually weak	Encoding and simulation overhead often omitted. 
+Strong	End-to-end runtime, peak RAM, circuit evaluations, shots, parameter count
+Strongest defensible gaps
+Anatomical-prior ablation for QML: Few high-quality studies appear to test whether restricting representations to segmented lung fields improves QML reliability relative to whole-CXR representations.
+
+External generalization: QML-TB studies with source-separated external validation, patient-level splits, and matched classical controls appear limited.
+
+Low-data learning curves: The claim that QML helps in low-data settings is common, but disease-imaging evidence with repeated subsampling, confidence intervals, and matched feature spaces is insufficient.
+
+Clinical reliability rather than headline accuracy: Calibration, uncertainty-based abstention, failure analysis, and explanation-localization agreement are underreported in QML imaging.
+
+Resource-accounted benchmark: There is a lack of end-to-end comparisons that report preprocessing cost, feature compression, circuit size/depth, shots, simulator/hardware runtime, and matched classical alternatives.
+
+5. Five candidate directions
+Rank	Direction	Novelty	Feasibility	SIH relevance	Paper potential	Main risk
+1	Segmented-lung vs whole-CXR low-qubit QSVM benchmark with external TB validation	8	9	10	9	QML does not outperform
+2	Low-data learning curves for QSVM/VQC vs matched SVM/MLP	8	8	9	9	Results show no quantum benefit
+3	Lesion-aware TBX11K embedding study: whole lung vs lesion ROI vs lesion-context	8	6	9	9	Label/ROI quality and time
+4	Calibration-aware hybrid QML triage with abstention	7	8	9	8	Limited QML-specific uncertainty benefit
+5	Hardware-noise robustness of QSVM/VQC features for TB	7	5	8	8	Hardware access/noise dominates
+1. Recommended direction
+Research question: Does lung segmentation improve external generalization, calibration, and low-data performance of low-qubit quantum-kernel TB classifiers based on fixed CXR embeddings?
+
+Hypothesis: Lung-field restriction removes non-anatomical confounders and yields more stable low-dimensional embeddings. In small-data settings, QSVM performance may be competitive with—not assumed superior to—matched classical SVM and MLP baselines.
+
+Novelty: Not “QML detects TB.” Instead: a factorial, anatomically grounded, externally validated benchmark:
+
+Whole CXR vs Lung-only CXR
+×
+Classical SVM/MLP vs QSVM/VQC
+×
+Full-data vs Low-data
+Whole CXR vs Lung-only CXR×Classical SVM/MLP vs QSVM/VQC×Full-data vs Low-data
+Datasets: TBX11K for scale and lesion boxes; Shenzhen and Montgomery for external validation.
+
+QML: Primary QSVM / quantum kernel; backup shallow VQC/QNN.
+
+Publishable if QML loses: The contribution becomes evidence delimiting where QML does not currently add clinical value, with transparent resource and robustness analysis. Negative results are valuable if the evaluation is rigorous and reproducible.
+
+Weighted scores
+Weights: technical defensibility 20%, feasibility 15%, SIH relevance 15%, paper potential 15%, novelty 10%, demo potential 10%, data availability 10%, compute feasibility 5%.
+
+Direction	Weighted score / 10
+1. Anatomically grounded QSVM benchmark	8.8
+2. Low-data QML learning-curve study	8.4
+3. Lesion-aware TBX11K QML study	7.8
+4. Calibration/abstention QML triage	7.8
+5. Hardware-noise robustness	6.9
+6. Dataset strategy
+Dataset	Disease/task	Images / patients	Labels / annotations	Access and use limitations	Best role
+Shenzhen	TB vs normal	662 images; 336 TB, 326 normal	Image-level TB label; demographic metadata reported	Public research dataset through NLM collection; verify current conditions before redistribution	External test or small demonstration set
+Montgomery County	TB vs normal	138 images; 58 TB, 80 normal	Image-level TB label; classic collection	Public research dataset; too small for primary training alone	External stress test / proof-of-work
+TBX11K	TB classification + TB-area detection	11,200 images	Five categories; TB-area bounding boxes	Reported CC BY 4.0 by aggregator; verify official repository terms before commercial use	Primary research dataset
+NIH ChestX-ray14	14 thoracic labels including pneumonia	112,120 images; 30,805 patients	NLP-derived image-level labels; some localization annotations	NIH reports no use restrictions with attribution requirements; labels are weak/noisy	Pretraining, pneumonia extension, non-TB controls
+CheXpert	14 observations including pneumonia	224,316 images; 65,240 patients	Positive/negative/uncertain labels; expert-labeled validation/test sets	Research Use Agreement required; do not treat as unrestricted commercial data	Robust pneumonia extension
+MIMIC-CXR / MIMIC-CXR-JPG	Broad thoracic findings	377,110 images; ~227,8xx studies	Reports and derived labels	Credentialed access, training, DUA; research-only terms and code-sharing obligations	Later external validation; not for 3-day prototype
+PadChest	Multi-label chest pathology	Large Spanish CXR collection	Labels, projections, reports/metadata vary by release	Check current official terms before use	Later external validation
+RSNA Pneumonia	Pneumonia detection/localization	~30,000 frontal images drawn from NIH CXR8	Pneumonia boxes and classes	Terms permit stated research/education and other allowed uses with attribution; accept official terms	Pneumonia secondary demonstrator
+Shenzhen and Montgomery should not be randomly pooled and then split if the goal is generalization. A stronger design is train on TBX11K or Shenzhen and externally test on Montgomery; then reverse where feasible. The datasets differ in acquisition setting and scale, which makes source-separated evaluation more informative.
+
+Recommended dataset plan
+Internal SIH proof-of-work: Shenzhen + Montgomery, because they are small, fast to obtain, clearly TB-specific, and well known.
+
+Post-selection research training: TBX11K, restricted to a clearly defined binary or multiclass protocol.
+
+External TB validation: Shenzhen and Montgomery held out by dataset/source.
+
+Pneumonia extension: RSNA pneumonia or CheXpert after the TB module is stable.
+
+Do not claim clinical or commercial permission merely because a dataset is downloadable. MIMIC-CXR is explicitly restricted to credentialed users under a DUA.
+
+Do not use your personal CXR as a training datum or validation evidence. It can be used only as a private UI demonstration with explicit “demo only / not medical advice” labeling.
+
+7. Minimum credible baselines
+Required
+Baseline	Why it is required
+DenseNet-121 fine-tuning	A strong, standard medical-CXR transfer-learning benchmark
+EfficientNet-B0 or B2 fine-tuning	Parameter-efficient CNN comparison
+Frozen DenseNet/ConvNeXt embedding + logistic regression	Tests whether representation alone explains performance
+Frozen embedding + RBF-SVM	The closest fair classical comparator to QSVM
+PCA-reduced embedding + RBF-SVM	Must use the same reduced features provided to QSVM
+PCA-reduced embedding + MLP	Nonlinear neural baseline in the same low-dimensional feature regime
+QSVM / quantum kernel SVM	Primary QML method
+Shallow VQC/QNN	Secondary QML sensitivity check, not mandatory for first prototype
+Useful but not mandatory
+ConvNeXt-Tiny: strong modern CNN, but include only if compute and time allow.
+
+ViT/Swin: useful for later paper work, but redundant during the 3–4 day proof.
+
+XGBoost: useful when features are tabular/radiomic; less essential for pretrained image embeddings.
+
+Classical linear SVM: include as a lower-bound comparator.
+
+Avoid redundancy
+Do not benchmark six similar CNNs during the internal round. One strong CNN, one parameter-efficient CNN, and one matched feature-space classical SVM are more scientifically persuasive than a model zoo.
+
+8. Quantum-model strategy
+Method	Inputs / encoding	Qubits	Strengths	Risks	3–4 day suitability
+QSVM / quantum kernel	PCA-selected 4–8 normalized embedding features; angle or ZZ feature map	4–8	Stable training because SVM optimization remains classical; easy matched RBF-SVM comparison	Kernel matrix cost scales poorly with sample count; no guaranteed advantage	Best primary method
+VQC classifier	4–8 features with angle encoding; shallow entangling ansatz	4–8	End-to-end trainable, visibly “quantum neural” for demo	Barren plateaus, optimizer sensitivity, shot noise, overfitting	Best backup
+Hybrid neural net + quantum layer	CNN embedding → 4–8 features → VQC → classifier	4–8	Natural hybrid architecture	Training complexity and instability	Use later; freeze CNN initially
+Quanvolution	Image patches processed through quantum circuits	Many repeated circuit calls	Visually intuitive	Extremely expensive, weak resource justification, hard fair comparison	Do not attempt now
+Amplitude encoding	Compressed vector encoded into amplitudes	
+⌈
+log
+⁡
+2
+d
+⌉
+⌈log 
+2
+​
+ d⌉ theoretically	Fewer qubits on paper	State preparation can be expensive and non-NISQ practical	Avoid for initial work
+Quantum annealing	QUBO formulation	Platform-specific	Could fit optimization problems	Not a direct fit for CXR classification prototype	Not now
+Primary recommendation: QSVM
+Use:
+
+Frozen DenseNet-121 or EfficientNet-B0 embedding.
+
+Lung-mask crop and whole-CXR branches.
+
+StandardScaler fit on training only.
+
+PCA to 4, 6, or 8 components fit on training only.
+
+QSVM using an explicit feature map such as ZZFeatureMap.
+
+Matched classical RBF-SVM using the exact same PCA components.
+
+This makes the quantum comparison fair: the QML model does not receive a privileged feature representation.
+
+Backup: shallow VQC
+Use a 4-qubit VQC with:
+
+Angle encoding
+
+One or two entangling layers
+
+Small parameter count
+
+Adam or SPSA optimizer
+
+Fixed frozen embeddings
+
+Noise-free simulator first
+
+Optional shot-based simulation second
+
+Do not attempt yet: quanvolution
+Quanvolution would require repeated quantum circuit evaluations per image patch and is likely to consume the project schedule without providing a credible comparison. It also invites the criticism that the quantum layer is arbitrary and computationally expensive.
+
+9. Rigorous experiment matrix
+Core factorial design
+Experiment	Input	Model	Purpose
+1	Whole CXR	Classical CNN + frozen embedding/SVM	Baseline clinical-image pipeline
+2	Lung-only CXR	Classical CNN + frozen embedding/SVM	Effect of anatomical prior
+3	Whole CXR embedding	QSVM / VQC	QML without segmentation
+4	Lung-only embedding	QSVM / VQC	Main proposed hybrid condition
+Post-selection experiments
+Experiment	Question answered
+Training size at 10%, 25%, 50%, 100%	Does any method have lower sample requirements?
+Train Shenzhen, test Montgomery	Does it generalize across sources?
+Train TBX11K, test Shenzhen/Montgomery	Does scale-trained model transfer?
+PCA = 2, 4, 6, 8, 12	Does performance depend on quantum input bottleneck?
+Feature maps: Z, ZZ, Pauli	Is quantum encoding choice driving results?
+Circuit depth: 1, 2, 3	Is there a trainability/overfitting tradeoff?
+Clean vs shot-based/noisy simulation	Is the model robust to realistic execution?
+Whole CXR vs lung-only vs lesion-context ROI	Does anatomical region selection matter?
+Calibration before/after temperature scaling	Are probability outputs clinically interpretable?
+Explanation sanity checks	Do Grad-CAM activations stay inside lungs or lesion boxes?
+Splitting protocol
+Split at the patient level, never at image level where patient identifiers are available.
+
+Fit normalization, PCA, feature selection, calibration, augmentation decisions, and hyperparameters on training/validation only.
+
+Keep an untouched test set.
+
+Treat a different hospital/dataset as external test—not as extra validation data.
+
+If using TBX11K’s official split, preserve it for internal comparison, but create an additional source-separated external evaluation.
+
+Report mean and 95% confidence intervals across repeated seeds or bootstrapped test samples.
+
+Metrics
+For binary TB screening:
+
+AUROC
+
+AUPRC
+
+Sensitivity/recall at a preselected specificity
+
+Specificity
+
+F1 score
+
+Balanced accuracy
+
+MCC
+
+Brier score
+
+Expected calibration error
+
+Confusion matrix
+
+Inference latency
+
+End-to-end training time
+
+Circuit depth, qubit count, number of shots, number of circuit evaluations
+
+Meaningful evidence
+A meaningful result is not “QSVM accuracy is 1% higher once.” It is one or more of:
+
+a consistent improvement across repeated seeds with confidence intervals;
+
+improved external AUROC/AUPRC or sensitivity at fixed specificity;
+
+better calibration;
+
+lower degradation at reduced training-set sizes;
+
+fewer trainable parameters with comparable performance;
+
+stability under noise or source shift.
+
+Negative result
+A scientifically useful negative result would be:
+
+“After matched embedding reduction and patient/source-separated evaluation, QSVM/VQC did not outperform RBF-SVM or DenseNet baselines; lung segmentation improved both classical and quantum pipelines similarly; quantum simulation/hardware cost remained higher.”
+
+That is a legitimate and valuable contribution if well documented.
+
+10. 3–4 day implementation plan
+Must have
+Data provenance page
+
+Dataset name, source, counts, license/terms summary, intended research-only usage.
+
+Explicit “not a diagnostic device” notice.
+
+Binary TB demonstrator
+
+Shenzhen/Montgomery or a small clean TBX11K subset.
+
+Patient/source-aware organization where metadata permits.
+
+Lung segmentation
+
+Use a pretrained lung-mask model or reliable existing implementation.
+
+Create whole-CXR and lung-only versions.
+
+Do not train a segmentation network from scratch.
+
+Classical baseline
+
+DenseNet-121 or EfficientNet-B0 pretrained feature extractor.
+
+Logistic regression or RBF-SVM on frozen embeddings.
+
+One fine-tuned CNN only if time permits.
+
+Quantum baseline
+
+PCA 4 or 6 dimensions.
+
+Qiskit quantum kernel + QSVM.
+
+Matched RBF-SVM on identical PCA features.
+
+Benchmark table
+
+AUROC, F1, sensitivity, specificity, runtime, feature dimension, qubits.
+
+Label results as preliminary and non-clinical.
+
+Explainability
+
+Grad-CAM for the classical CNN feature extractor.
+
+PCA-feature sensitivity or permutation importance for the quantum branch.
+
+Do not pretend that quantum measurement probabilities are a clinical explanation.
+
+Simple UI
+
+Streamlit or Gradio.
+
+Upload CXR → show preprocessing/mask → classical score → quantum score → uncertainty/limitations → heatmap.
+
+The personal JPEG appears only as a private demo, never as reported experimental evidence.
+
+Should have if time remains
+VQC/QNN backup model.
+
+Bootstrap confidence intervals.
+
+Training-size comparison: 25%, 50%, 100%.
+
+One source-held-out result: train Shenzhen, test Montgomery.
+
+Shot-based Qiskit simulation.
+
+Docker environment or reproducibility requirements.txt.
+
+PDF report generated automatically from benchmark results.
+
+Do not build yet
+A full digital twin.
+
+EHR integration.
+
+IoT sensor network.
+
+Federated learning.
+
+Blockchain.
+
+Multimodal genomics.
+
+Real hospital deployment.
+
+Autonomous diagnosis claims.
+
+A massive custom segmentation model.
+
+Real quantum-hardware results unless you already have validated access and enough time.
+
+More than one disease in the first proof-of-work.
+
+11. Internal SIH pitch
+Narrative
+Problem: TB remains a high-impact disease; CXR screening can be useful but models may learn spurious markers, vary by site, and fail to communicate uncertainty.
+
+Existing AI: Classical deep learning can classify TB CXRs effectively, but deployment needs reliability, explainability, and external validation.
+
+Research opportunity: QML in health is promising but lacks rigorous evidence of benefit, especially under real resource constraints and cross-dataset validation.
+
+Hypothesis: Anatomically restricting the model to lung fields creates a more meaningful low-dimensional representation for hybrid quantum-classical learning.
+
+Architecture: CXR → quality checks → lung segmentation → deep embedding → PCA → classical and quantum classifiers → calibrated risk + explanation + benchmark card.
+
+Proof-of-work: Show both whole-image and segmented-lung branches; compare a classical baseline and QSVM using the same reduced feature space.
+
+Credibility: State that quantum benefit is a hypothesis, not a conclusion. The platform is designed to test it fairly.
+
+Future: Extend to TBX11K lesion localization, external validation, pneumonia, and hospital-ready validation only after clinical collaboration and regulatory assessment.
+
+Visuals to show
+Architecture diagram with classical and quantum branches.
+
+Before/after lung segmentation examples.
+
+Grad-CAM overlay with cautionary labeling.
+
+Qiskit circuit diagram: 4–6 qubits, feature map, measured output.
+
+Benchmark table with confidence intervals where possible.
+
+ROC curve and calibration plot.
+
+Dataset provenance/ethics slide.
+
+“What we do not claim” slide.
+
+What not to claim
+“Quantum advantage.”
+
+“First QML TB detector.”
+
+“Clinical-grade diagnosis.”
+
+“Replaces radiologists.”
+
+“Ready for hospital deployment.”
+
+“Detects early TB from any CXR.”
+
+“Works on all X-ray machines.”
+
+“Uses real quantum hardware” if it only uses a simulator.
+
+“Better than classical AI” before statistically valid evidence.
+
+Questions judges may ask
+Likely question	Defensible response
+Why use quantum at all?	We are testing a focused, low-dimensional QML hypothesis rather than assuming advantage. The project explicitly benchmarks against matched classical models.
+Why TB?	It is clinically meaningful, has public CXR datasets, and supports external-source validation and lesion-aware extensions. 
+Why segmentation?	It is an anatomical prior that may reduce non-lung confounds; we test it by ablation rather than assume it helps.
+Is this clinically deployable?	No. It is a research decision-support prototype, not a diagnostic device.
+What happens if quantum is worse?	The platform still delivers a valuable benchmark identifying limits, calibration, generalization behavior, and resource costs.
+Why not just use DenseNet?	DenseNet is included as a serious baseline. The QML branch is a controlled research module, not a replacement claim.
+Can it run on current hardware?	The immediate build uses Qiskit simulation; a later small-circuit hardware/noise test may assess reproducibility, not clinical performance.
+How do you prevent leakage?	Patient-level splits, train-only fitting of preprocessing/PCA, source-held-out tests, and no test-set tuning.
+12. Final recommendation
+A. Best research direction
+Anatomically grounded, externally validated hybrid QML benchmark for TB screening from CXR.
+
+B. Best initial disease/use case
+Binary TB-vs-non-TB CXR triage, initially using Shenzhen/Montgomery for proof-of-work and TBX11K for the research-scale phase.
+
+C. Best dataset strategy
+Immediate: Shenzhen + Montgomery.
+
+Main research: TBX11K.
+
+External testing: source-separated Shenzhen/Montgomery.
+
+Later extension: RSNA pneumonia or CheXpert.
+
+Never conflate public access with unrestricted clinical/commercial authorization.
+
+D. Best classical baseline
+DenseNet-121 frozen embedding + matched RBF-SVM, plus one fine-tuned DenseNet-121 or EfficientNet-B0. This gives both a strong image model and a fair comparator in the same reduced feature space.
+
+E. Best quantum model
+Primary: QSVM with a 4–8 feature quantum kernel.
+Backup: shallow 4–6 qubit VQC.
+Avoid quanvolution for the first version.
+
+F. Best research-gap statement
+Although classical TB-CXR classification and low-qubit QML image classification have both been explored, evidence remains limited on whether anatomically restricted lung-field representations improve the external generalization, calibration, and low-data behavior of QML relative to matched classical models under leakage-safe, resource-accounted evaluation.
+
+G. Best hypothesis
+Lung segmentation will produce lower-dimensional embeddings that are more stable across acquisition sources; in low-data settings, a quantum kernel may be competitive with classical low-dimensional models, but any benefit must be demonstrated through repeated, external, statistically reported comparisons.
+
+H. Best SIH architecture
+CXR
+→
+quality check
+→
+lung mask
+→
+whole/lung-only branches
+→
+DenseNet embedding
+→
+PCA
+→
+{
+RBF-SVM / MLP
+QSVM / shallow VQC
+→
+calibration + explanation + benchmark dashboard
+CXR→quality check→lung mask→whole/lung-only branches→DenseNet embedding→PCA→{ 
+RBF-SVM / MLP
+QSVM / shallow VQC
+​
+ →calibration + explanation + benchmark dashboard
+I. Best 3–4 day prototype
+A Streamlit/Gradio app showing:
+
+Uploaded CXR.
+
+Lung segmentation overlay.
+
+Whole-CXR and lung-only preprocessing.
+
+Classical prediction.
+
+QSVM prediction.
+
+Benchmark table.
+
+Grad-CAM image explanation.
+
+Explicit uncertainty and non-clinical-use disclaimer.
+
+J. Top five post-selection experiments
+Whole-CXR versus segmented-lung CXR for classical and QSVM models.
+
+TBX11K training with Shenzhen/Montgomery external validation.
+
+10%, 25%, 50%, and 100% training-size learning curves.
+
+PCA dimensionality, feature-map, and circuit-depth ablation.
+
+Calibration, abstention, runtime, simulation-noise, and resource-accounted benchmarking.
+
+K. Potential paper contribution
+A reproducible, clinically grounded benchmark showing whether low-qubit QML provides any measurable benefit—or fails to provide one—after lung segmentation, frozen deep feature extraction, fair classical matching, source-separated validation, and reliability analysis.
+
+L. Do not promise yet
+Quantum advantage.
+
+Superior diagnostic performance.
+
+Real quantum-hardware clinical feasibility.
+
+Generalizability to all hospitals or populations.
+
+Regulatory readiness.
+
+Autonomous diagnosis.
+
+Novelty claims such as “first-ever.”
+
+Digital twin, IoT, federated, multimodal, or genomics features that are not experimentally implemented.
+
+The central strategic insight is simple: make the scientific discipline itself your innovation. The winning pitch is not “we added quantum to a TB model.” It is “we built a rigorous platform that tests when hybrid QML is clinically meaningful, when it is not, and how anatomical priors, data scarcity, source shift, and hardware constraints shape that answer.”
+
+
+SIH26139 pitch deck: build a 12-slide investor & jury presentation for Egreen Quanta's Hybrid QML platform — architecture, clinical validation, and roadmap
+Computer
+
+Hybrid QML architecture blueprint: map the exact variational quantum circuit, EHR feature extractor, and classical classifier pipeline for SIH26139
+Computer
+
+Architecture design for the Egreen Quanta SIH26139 platform
+
+How to structure the hybrid quantum model for chest X-rays
+
+Addressing noisy intermediate scale quantum constraints in SIH26139
