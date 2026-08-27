@@ -2,7 +2,7 @@
 
 Welcome to the SIH26139 Project: **Anatomy-Grounded Hybrid Quantum AI for Early Disease Detection**. 
 
-This document is the absolute source of truth for the entire vision, architecture, phase connections, and operational methodology of our 4-person AI-Native team. Read this carefully to understand what we are building and how we are building it.
+This document is the absolute source of truth for the entire vision, architecture, phase connections, and operational methodology of our 6-person AI-Native team (4 Technical, 2 Non-Technical). Read this carefully to understand what we are building and how we are building it.
 
 ---
 ## 1. What is this project? (The Core Vision)
@@ -47,6 +47,10 @@ Our system is a strictly decoupled, 3-tier architecture to ensure quantum ML log
 ---
 ## 5. Phase Execution & Team Interlock
 We operate in 3 strict engineering phases. **No one moves to the next phase until E4's automated tests pass.**
+
+### The Non-Technical Pitch Team
+- **E5 (Storytelling):** Designs the pitch narrative, slide copy, and spoken demo scripts without faking quantum advantage.
+- **E6 (Visual Design):** Turns the architecture and metrics into a premium, academic-grade visual presentation.
 
 ### Phase 1: Foundation & Data Preparation
 - **E2 (Backend):** Downloads medical datasets, builds the PyTorch U-Net segmentation pipeline, and strictly splits data into Train/Test folders.
