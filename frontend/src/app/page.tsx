@@ -1,95 +1,123 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import UploadWidget from "@/components/UploadWidget";
-import ResultsDashboard from "@/components/ResultsDashboard";
-import WorkstationControls from "@/components/WorkstationControls";
+import LeftToolRail from "@/components/LeftToolRail";
+import XrayCanvas from "@/components/XrayCanvas";
+import RightIntelligence from "@/components/RightIntelligence";
+import QuantumCircuitView from "@/components/QuantumCircuitView";
+import RadiologyQueue from "@/components/RadiologyQueue";
+import { Study, ToolMode, PredictionResults, EvidenceItem } from "../types/workstation";
+import { mockStudies, mockPredictions, mockEvidence } from "../mock/studies";
 
-interface PredictionResults {
-  classical_svm_confidence: number;
-  quantum_svm_confidence: number;
-  prediction: string;
-  inference_time_seconds: number;
-  is_mock: boolean;
-}
+const PIPELINE_STAGES = [
+  "IMAGE INGESTION",
+  "ANATOMICAL SEGMENTATION",
+  "FEATURE EXTRACTION",
+  "PCA COMPRESSION",
+  "CLASSICAL INFERENCE",
+  "QUANTUM ENCODING",
+  "QSVM KERNEL EVALUATION",
+  "CONSENSUS CONVERGENCE"
+];
 
 export default function Home() {
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<PredictionResults | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedStudy, setSelectedStudy] = useState<Study | null>(null);
+  const [activeMode, setActiveMode] = useState<ToolMode>("SCAN");
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [sharpness, setSharpness] = useState(100);
 
-  // Viewport transformation states
+  // Viewport transforms
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  useEffect(() => {
-    // Cleanup preview URL on unmount
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
+  // Analysis states
+  const [loading, setLoading] = useState(false);
+  const [activeStageIdx, setActiveStageIdx] = useState(-1);
+  const [results, setResults] = useState<PredictionResults | null>(null);
+  const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleFileSelected = async (selectedFile: File) => {
-    setFile(selectedFile);
-    setError(null);
-    setResults(null);
+  // Switch between patient list queue and workspace console
+  const [viewMode, setViewMode] = useState<"QUEUE" | "WORKSPACE">("QUEUE");
+
+  // Custom study uploads
+  const [studies, setStudies] = useState<Study[]>(mockStudies);
+
+  const handleSelectStudy = (study: Study) => {
+    setSelectedStudy(study);
+    setViewMode("WORKSPACE");
     
-    const url = URL.createObjectURL(selectedFile);
-    setPreviewUrl(url);
-
-    // Automatically trigger analysis on file selection
-    await runAnalysis(selectedFile);
-  };
-
-  const runAnalysis = async (targetFile: File) => {
-    setLoading(true);
-    setError(null);
-
-    const formData = new FormData();
-    formData.append("file", targetFile);
-
-    try {
-      // Hit local FastAPI backend directly
-      const response = await fetch("http://localhost:8000/predict", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Analysis failed with status ${response.status}`);
-      }
-
-      const data: PredictionResults = await response.json();
-      setResults(data);
-    } catch (err: any) {
-      console.error(err);
-      setError("Inference server connection failed. Please ensure the FastAPI backend is running.");
-      // Fallback dummy results for isolated frontend testing if backend is offline
-      setResults({
-        classical_svm_confidence: 0.87,
-        quantum_svm_confidence: 0.92,
-        prediction: "Anomaly Detected",
-        inference_time_seconds: 0.485,
-        is_mock: true,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetImage = () => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-    setFile(null);
-    setPreviewUrl(null);
-    setResults(null);
-    setError(null);
+    // Reset controls
+    setBrightness(100);
+    setContrast(100);
+    setSharpness(100);
     setZoomLevel(1);
+    setResults(null);
+    setEvidence([]);
+    setError(null);
+    
+    // Trigger analysis automatically
+    triggerWorkflow(study);
+  };
+
+  const triggerWorkflow = (study: Study) => {
+    setLoading(true);
+    setResults(null);
+    setEvidence([]);
+    setActiveStageIdx(0);
+  };
+
+  // Run the progressive pipeline animation steps
+  useEffect(() => {
+    if (!loading || activeStageIdx === -1) return;
+
+    if (activeStageIdx < PIPELINE_STAGES.length) {
+      const duration = activeStageIdx === 6 ? 1200 : 400; // Let QSVM step take slightly longer for visual impact
+      const timer = setTimeout(() => {
+        setActiveStageIdx((prev) => prev + 1);
+      }, duration);
+      return () => clearTimeout(timer);
+    } else {
+      // Pipeline complete: Load mock or fetch results
+      setLoading(false);
+      setActiveStageIdx(-1);
+      if (selectedStudy) {
+        setResults(mockPredictions[selectedStudy.id] || {
+          classical_svm_confidence: 0.87,
+          quantum_svm_confidence: 0.92,
+          prediction: "Anomaly Detected",
+          inference_time_seconds: 0.485,
+          is_mock: true
+        });
+        setEvidence(mockEvidence[selectedStudy.id] || []);
+      }
+    }
+  }, [loading, activeStageIdx, selectedStudy]);
+
+  const handleCustomUpload = (file: File) => {
+    const customId = `XR-TEMP-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newStudy: Study = {
+      id: customId,
+      patientId: `PT-${Math.floor(1000 + Math.random() * 9000)}`,
+      patientName: file.name.substring(0, 15) || "Custom Import",
+      age: 45,
+      sex: "M",
+      modality: "IMPORTED CXR",
+      acquisitionDate: new Date().toLocaleTimeString(),
+      status: "READY",
+      imageUrl: URL.createObjectURL(file),
+    };
+
+    setStudies([newStudy, ...studies]);
+    handleSelectStudy(newStudy);
+  };
+
+  const handleResetWorkspace = () => {
+    setSelectedStudy(null);
+    setResults(null);
+    setEvidence([]);
+    setViewMode("QUEUE");
   };
 
   const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 0.1, 2.0));
@@ -97,157 +125,163 @@ export default function Home() {
   const handleResetZoom = () => setZoomLevel(1);
   const handleToggleFullscreen = () => setIsFullscreen((prev) => !prev);
 
+
   return (
-    <main className="min-h-screen bg-[#090b11] text-[#E2E8F0] py-6 px-4 md:px-8 font-sans selection:bg-blue-500/30 selection:text-white">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <main className="min-h-screen bg-[#07090d] text-[#e2e8f0] py-4 px-4 md:px-6 font-sans">
+      <div className="max-w-7xl mx-auto space-y-4">
         
-        {/* HEADER SECTION */}
-        <header className="border-b border-gray-900 pb-4 flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0">
+        {/* HEADER BAR */}
+        <header className="border-b border-gray-800 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-[10px] font-mono tracking-widest text-emerald-500 uppercase">SYS ACTIVE</span>
-              <span className="text-gray-800 text-[10px] font-mono">|</span>
-              <span className="text-[10px] font-mono text-gray-500 tracking-wider">VERSION 1.0.0</span>
+              <span className="text-[9px] font-mono tracking-widest text-emerald-400">SYS READY</span>
+              <span className="text-gray-800">|</span>
+              <span className="text-[9px] font-mono text-gray-500">SIH26139 WORKSTATION v1.2</span>
             </div>
-            <h1 className="text-xl font-extrabold tracking-tight text-white font-mono uppercase">
-              ANATOMY-GROUNDED HYBRID QUANTUM AI
+            <h1 className="text-lg font-bold tracking-tight text-white font-mono uppercase">
+              ANATOMY // INTELLIGENCE
             </h1>
-            <p className="text-xs text-gray-400 font-mono">
-              TB Early Detection Research Console / Chest X-Ray DICOM Analyzer
+            <p className="text-[10px] text-gray-400 font-mono">
+              Chest X-Ray Anatomy-Grounded Hybrid Quantum Analysis Console
             </p>
           </div>
 
-          {/* Subtly labeled research disclaimer */}
-          <div className="px-3 py-1.5 border border-yellow-900/30 bg-yellow-950/10 rounded-md text-[10px] text-yellow-600/80 max-w-sm leading-relaxed">
-            <strong>RESEARCH USE ONLY:</strong> This workstation is an experimental QML validator and does not provide clinical diagnostic findings.
+          <div className="flex items-center space-x-3">
+            {viewMode === "WORKSPACE" && (
+              <button
+                onClick={handleResetWorkspace}
+                className="px-2.5 py-1 bg-gray-900 border border-gray-800 hover:bg-gray-800 text-[10px] font-mono text-gray-400 rounded transition-colors"
+              >
+                [ VIEW ALL STUDIES ]
+              </button>
+            )}
+            
+            <div className="px-3 py-1 border border-yellow-950 bg-yellow-950/10 rounded text-[9px] text-yellow-600 max-w-xs leading-tight">
+              <strong>EVALUATION PROTOCOL:</strong> Experimental QML interface. Not for clinical diagnostic use.
+            </div>
           </div>
         </header>
 
-        {/* ERROR DISPLAY */}
-        {error && (
-          <div className="px-4 py-2 bg-red-950/20 border border-red-900/40 rounded-lg text-xs text-red-400 font-mono flex items-center justify-between">
-            <span>[SYS_ERR]: {error}</span>
-            <button onClick={() => setError(null)} className="text-gray-500 hover:text-white">✕</button>
-          </div>
-        )}
-
-        {/* PRIMARY WORKSPACE */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* LEFT: MEDICAL IMAGE VIEWPORT (8 cols) */}
-          <section className={`lg:col-span-8 flex flex-col space-y-3 ${isFullscreen ? "fixed inset-0 bg-[#090b11] z-50 p-6" : ""}`}>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-mono text-gray-400 tracking-wide">
-                {isFullscreen ? "FULLSCREEN MONITOR VIEW" : "PRIMARY SCANNED IMAGE VIEWPORT"}
-              </span>
-              {previewUrl && (
-                <button 
-                  onClick={handleResetImage}
-                  className="text-xs font-mono text-red-500 hover:text-red-400 transition-colors"
-                >
-                  [ EJECT STUDY ]
+        {/* WORKSPACE LAYOUT CONTAINER */}
+        {viewMode === "QUEUE" ? (
+          <div className="space-y-4">
+            {/* Custom Scan Importer Box */}
+            <div className="border border-gray-800 bg-[#0d1117] rounded-lg p-4 flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-white font-mono">DEMONSTRATION SCAN INGESTION</h4>
+                <p className="text-[10px] text-gray-500 mt-1">Upload a JPEG/PNG chest X-ray image to start a live analysis session.</p>
+              </div>
+              <div className="relative">
+                <input
+                  type="file"
+                  onChange={(e) => e.target.files && handleCustomUpload(e.target.files[0])}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  accept="image/jpeg, image/png"
+                />
+                <button className="px-3 py-1.5 bg-blue-950/40 hover:bg-blue-900/60 border border-blue-900/50 text-blue-400 text-[10px] font-mono font-bold rounded">
+                  + IMPORT NEW SCAN
                 </button>
-              )}
+              </div>
             </div>
 
-            {/* Viewport Container */}
-            <div className="relative border border-gray-800 rounded-lg bg-[#07090e] h-[450px] flex items-center justify-center overflow-hidden">
-              
-              {/* Medical grid overlays (crosshairs, corners) */}
-              <div className="absolute inset-4 border border-gray-900/40 pointer-events-none z-0"></div>
-              <div className="absolute top-2 left-2 border-t-2 border-l-2 border-gray-700 w-3 h-3 pointer-events-none"></div>
-              <div className="absolute top-2 right-2 border-t-2 border-r-2 border-gray-700 w-3 h-3 pointer-events-none"></div>
-              <div className="absolute bottom-2 left-2 border-b-2 border-l-2 border-gray-700 w-3 h-3 pointer-events-none"></div>
-              <div className="absolute bottom-2 right-2 border-b-2 border-r-2 border-gray-700 w-3 h-3 pointer-events-none"></div>
+            {/* Radiology Queue Table */}
+            <RadiologyQueue studies={studies} onSelectStudy={handleSelectStudy} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            
+            {/* LEFT COLUMN: TOOLS (2 cols) */}
+            <div className="lg:col-span-2">
+              <LeftToolRail
+                activeMode={activeMode}
+                onModeChange={setActiveMode}
+                brightness={brightness}
+                onBrightnessChange={setBrightness}
+                contrast={contrast}
+                onContrastChange={setContrast}
+                sharpness={sharpness}
+                onSharpnessChange={setSharpness}
+              />
+            </div>
 
-              {!previewUrl ? (
-                <div className="w-full h-full p-4 flex items-center justify-center z-10">
-                  <UploadWidget onFileSelected={handleFileSelected} />
-                </div>
-              ) : (
-                <div className="relative w-full h-full flex items-center justify-center z-10">
-                  
-                  {/* Actual X-Ray Rendering */}
-                  <img
-                    src={previewUrl}
-                    alt="Active Patient Study"
-                    className="max-h-[90%] max-w-[90%] object-contain select-none transition-transform duration-200"
-                    style={{ transform: `scale(${zoomLevel})` }}
-                  />
+            {/* CENTER COLUMN: VIEWPORT CANVAS (7 cols) */}
+            <div className="lg:col-span-7 space-y-3">
+              <XrayCanvas
+                study={selectedStudy}
+                activeMode={activeMode}
+                brightness={brightness}
+                contrast={contrast}
+                sharpness={sharpness}
+                evidence={evidence}
+                zoomLevel={zoomLevel}
+                onZoomIn={handleZoomIn}
+                onZoomOut={handleZoomOut}
+                onReset={handleResetZoom}
+                onToggleFullscreen={handleToggleFullscreen}
+              />
 
-                  {/* Loading Scan Overlay */}
-                  {loading && (
-                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center space-y-4">
-                      {/* Scanline Animation */}
-                      <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-[scan_2s_ease-in-out_infinite]"></div>
-                      
-                      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-xs font-mono text-blue-400 animate-pulse uppercase tracking-wider">
-                        Running Hybrid QML Inference...
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Top-left image specs */}
-                  <div className="absolute top-4 left-4 font-mono text-[9px] text-gray-500 bg-[#090b11]/80 px-2 py-1 rounded border border-gray-850">
-                    <p>ID: {file?.name.substring(0, 16) || "DICOM"}</p>
-                    <p>SCALE: {zoomLevel.toFixed(1)}x</p>
-                    <p>SIZE: {file ? (file.size / 1024).toFixed(0) : 0} KB</p>
+              {/* Patient Record Card */}
+              {selectedStudy && (
+                <div className="bg-[#0d1117] border border-gray-800 rounded-lg p-3 text-[10px] font-mono grid grid-cols-4 gap-4 text-gray-400">
+                  <div>
+                    <span className="text-gray-500 block">PATIENT ID</span>
+                    <span className="text-white">{selectedStudy.patientId}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block">PATIENT NAME</span>
+                    <span className="text-white">{selectedStudy.patientName}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block">AGE / SEX</span>
+                    <span className="text-white">{selectedStudy.age}Y / {selectedStudy.sex}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 block">ACQUISITION TIME</span>
+                    <span className="text-white">{selectedStudy.acquisitionDate}</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Viewport Control Panel */}
-            {previewUrl && (
-              <div className="flex justify-between items-center bg-[#0d1117] p-2 border border-gray-850 rounded-lg">
-                <WorkstationControls
-                  onZoomIn={handleZoomIn}
-                  onZoomOut={handleZoomOut}
-                  onReset={handleResetZoom}
-                  onToggleFullscreen={handleToggleFullscreen}
-                />
-                
-                <span className="text-[10px] text-gray-500 font-mono">
-                  {file ? file.name : "DICOM study loaded"}
-                </span>
-              </div>
-            )}
-          </section>
-
-          {/* RIGHT: ANALYSIS PANEL (4 cols) */}
-          <section className="lg:col-span-4 space-y-4">
-            <span className="text-xs font-mono text-gray-400 tracking-wide block">
-              DIAGNOSTIC ANALYSIS & RESULTS
-            </span>
-
-            {/* Dashboard Container */}
-            <div className="space-y-4">
-              {loading && !results ? (
-                <div className="w-full border border-gray-800 rounded-lg p-8 bg-[#0d1117] text-center space-y-3">
-                  <div className="inline-block w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-xs font-mono text-gray-400">ANALYZING STUDY PARALLEL PIPELINES...</p>
+            {/* RIGHT COLUMN: INTELLIGENCE & CIRCUITS (3 cols) */}
+            <div className="lg:col-span-3 space-y-4">
+              {/* Pipeline Loading Screen or Right Intelligence results */}
+              {loading ? (
+                <div className="border border-gray-800 rounded-lg p-4 bg-[#0d1117] space-y-4 font-mono">
+                  <span className="text-[10px] text-gray-500 tracking-wider block">EXECUTION PIPELINE</span>
+                  <div className="space-y-2">
+                    {PIPELINE_STAGES.map((stage, idx) => {
+                      const isComplete = idx < activeStageIdx;
+                      const isProcessing = idx === activeStageIdx;
+                      return (
+                        <div key={stage} className="flex items-center justify-between text-[9px] py-1 border-b border-gray-850/30">
+                          <span className={isProcessing ? "text-blue-400 font-bold" : isComplete ? "text-gray-500" : "text-gray-700"}>
+                            {stage}
+                          </span>
+                          <span className="text-[9px]">
+                            {isComplete && <span className="text-green-500">✓ COMPLETE</span>}
+                            {isProcessing && <span className="text-blue-400 animate-pulse">● RUNNING</span>}
+                            {!isComplete && !isProcessing && <span className="text-gray-700">○ QUEUED</span>}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <ResultsDashboard results={results} />
+                <>
+                  <RightIntelligence results={results} loading={loading} />
+                  
+                  {/* Quantum circuit board visualization */}
+                  <QuantumCircuitView isAnimating={activeStageIdx >= 5 || loading} />
+                </>
               )}
-
-              {/* Console workflow info */}
-              <div className="border border-gray-850 bg-[#0d1117] rounded-lg p-3 text-[10px] font-mono text-gray-500 leading-relaxed">
-                <h5 className="font-bold text-gray-400 uppercase mb-1">Inference Execution:</h5>
-                <ol className="list-decimal list-inside space-y-1">
-                  <li>Ingest CXR DICOM/Image.</li>
-                  <li>U-Net anatomical lung segmentation.</li>
-                  <li>CNN feature extraction (1024 dims).</li>
-                  <li>PCA dimensional compression (8 dims).</li>
-                  <li>Classical RBF-SVM & QSVM kernel matching.</li>
-                </ol>
-              </div>
             </div>
-          </section>
 
-        </div>
+          </div>
+        )}
+
       </div>
     </main>
   );
