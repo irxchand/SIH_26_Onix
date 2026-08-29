@@ -1,19 +1,42 @@
 "use client";
 
 import React, { useState } from "react";
-import { PredictionResults, Study, ChecklistStep } from "../types/workstation";
+import { PredictionResults, Study, ChecklistStep, ToolMode } from "../types/workstation";
 
 interface RightIntelligenceProps {
   study: Study | null;
   results: PredictionResults | null;
   loading: boolean;
   checklist: ChecklistStep[];
+  activeMode: ToolMode;
   onAccept: () => void;
   onReject: () => void;
 }
 
-export default function RightIntelligence({ study, results, loading, checklist, onAccept, onReject }: RightIntelligenceProps) {
+export default function RightIntelligence({ study, results, loading, checklist, activeMode, onAccept, onReject }: RightIntelligenceProps) {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [aiReport, setAiReport] = useState<string | null>(null);
+
+  const generateReport = async () => {
+    if (!study) return;
+    setIsGeneratingReport(true);
+    setAiReport(null);
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/studies/${study.id}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: `Generate a short radiology report for patient ${study.patientName}, Age ${study.age}, Sex ${study.sex}. QSVM Model predicted: ${results?.prediction} with ${Math.round((results?.quantum_svm_confidence || 0) * 100)}% confidence.` })
+      });
+      const data = await res.json();
+      setAiReport(data.report);
+    } catch (e) {
+      console.error(e);
+      setAiReport("Failed to generate report.");
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -84,6 +107,30 @@ export default function RightIntelligence({ study, results, loading, checklist, 
               Reject ✕
             </button>
           </div>
+        </div>
+      )}
+
+      {/* AI REPORT GENERATOR (ANNOTATE MODE) */}
+      {activeMode === "ANNOTATE" && (
+        <div className="border border-gray-800 rounded-lg p-3 bg-[#0d1117] space-y-3">
+          <span className="text-[10px] text-blue-400 font-bold tracking-widest block border-b border-gray-850 pb-2">
+            AI REPORT GENERATOR
+          </span>
+          <p className="text-[10px] text-gray-500">
+            Generate a clinical radiology report using the LLM agent via Browser API.
+          </p>
+          <button 
+            onClick={generateReport} 
+            disabled={isGeneratingReport}
+            className="w-full bg-blue-900/40 hover:bg-blue-900/60 text-blue-400 border border-blue-900 py-1.5 rounded text-[10px] font-bold transition-colors disabled:opacity-50"
+          >
+            {isGeneratingReport ? "GENERATING..." : "GENERATE AI REPORT"}
+          </button>
+          {aiReport && (
+            <div className="mt-2 p-2 bg-[#07090e] border border-gray-800 rounded text-[10px] text-gray-300">
+              {aiReport}
+            </div>
+          )}
         </div>
       )}
 

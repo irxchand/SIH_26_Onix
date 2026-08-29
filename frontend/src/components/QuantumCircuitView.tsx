@@ -13,6 +13,7 @@ interface QuantumCircuitViewProps {
 
 export default function QuantumCircuitView({ isAnimating, metrics }: QuantumCircuitViewProps) {
   const [activeStep, setActiveStep] = useState(-1);
+  const [qasm, setQasm] = useState<string | null>(null);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -23,6 +24,13 @@ export default function QuantumCircuitView({ isAnimating, metrics }: QuantumCirc
         step = (step + 1) % 6;
         setActiveStep(step);
       }, 500);
+
+      fetch("http://localhost:8000/api/v1/quantum/circuit")
+        .then(res => res.json())
+        .then(data => {
+          if (data.qasm) setQasm(data.qasm);
+        })
+        .catch(err => console.error("Failed to fetch QASM:", err));
     } else {
       setActiveStep(-1);
     }
@@ -138,6 +146,16 @@ export default function QuantumCircuitView({ isAnimating, metrics }: QuantumCirc
           {isAnimating ? "SIMULATING..." : "STANDBY"}
         </span>
       </div>
+
+      {/* RAW QASM EXPORT */}
+      {qasm && (
+        <div className="mt-4 border-t border-gray-850 pt-3">
+          <span className="text-[10px] text-gray-500 font-bold tracking-wider mb-2 block">OPENQASM KERNEL SOURCE</span>
+          <pre className="bg-[#07090e] border border-gray-800 rounded p-2 text-[8px] text-gray-400 overflow-x-auto max-h-[100px]">
+            {qasm}
+          </pre>
+        </div>
+      )}
     </div>
   );
 }

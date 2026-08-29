@@ -3,7 +3,7 @@
 # Qiskit Simulator Constraints
 # High dimensions will crash the local simulator. 
 # We strictly enforce PCA reduction to this number of components before feeding into the ZZFeatureMap.
-PCA_COMPONENTS = 8
+PCA_COMPONENTS = 10
 
 # Image Constraints
 TARGET_IMAGE_SIZE = (224, 224) # Standard for DenseNet121

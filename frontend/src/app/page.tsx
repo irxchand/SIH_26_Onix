@@ -388,6 +388,7 @@ export default function Home() {
                     results={results} 
                     loading={loading} 
                     checklist={checklist}
+                    activeMode={activeMode}
                     onAccept={async () => {
                       if (!selectedStudy) return;
                       await fetch(`${API_BASE}/api/v1/studies/${selectedStudy.id}/status`, {

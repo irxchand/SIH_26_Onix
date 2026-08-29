@@ -123,3 +123,6 @@ class AnnotationRequest(BaseModel):
 
 class StatusRequest(BaseModel):
     status: StudyStatus
+
+class ReportRequest(BaseModel):
+    prompt: str
