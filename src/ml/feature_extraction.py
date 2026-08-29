@@ -152,6 +152,37 @@ class CXRFeatureExtractor:
             feats = self.feature_fn(self.model, tensor)
         return feats.squeeze(0)
 
+    def extract_with_cam(self, image_path: str):
+        """Extract features and return simple Grad-CAM simulated spatial coordinates."""
+        if self.encoder_name != "densenet121":
+            raise ValueError("CAM extraction currently only supported for densenet121")
+            
+        img = Image.open(image_path).convert("RGB")
+        if self.clahe:
+            img = self._apply_clahe(img)
+            
+        tensor = self.transform(img).unsqueeze(0)
+        with torch.no_grad():
+            out = self.model.features(tensor) # (1, 1024, 7, 7)
+            
+            # Global Average Pooling for the 1024-D embedding
+            pooled = F.adaptive_avg_pool2d(out, (1, 1))
+            feats = torch.flatten(pooled, 1).squeeze(0)
+            
+            # Simple CAM: average across channels to find anomaly activation
+            cam = out.mean(dim=1).squeeze(0) # (7, 7)
+            
+            # Find argmax
+            max_idx = torch.argmax(cam)
+            y_idx = float(max_idx // 7)
+            x_idx = float(max_idx % 7)
+            
+            # Map 7x7 grid to 0-100 percent for UI bounding box mapping
+            xPercent = (x_idx / 6.0) * 100.0
+            yPercent = (y_idx / 6.0) * 100.0
+            
+        return feats, {"xPercent": xPercent, "yPercent": yPercent, "intensity": float(cam.max())}
+
 
 # Default backward-compatible extractor (DenseNet, whole CXR)
 class DenseNetFeatureExtractor(CXRFeatureExtractor):

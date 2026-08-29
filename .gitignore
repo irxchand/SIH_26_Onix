@@ -29,3 +29,9 @@ htmlcov/
 __pycache__/
 
 data/
+
+# Credentials & Browser Sessions
+.browser_profiles/
+cookies.json
+*.json.tmp
+test_input.json

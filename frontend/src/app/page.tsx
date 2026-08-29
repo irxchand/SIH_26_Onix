@@ -59,6 +59,7 @@ export default function Home() {
   // Custom study uploads
   const [studies, setStudies] = useState<Study[]>([]);
   const [queueLoading, setQueueLoading] = useState(true);
+  const [annoTrigger, setAnnoTrigger] = useState(0);
 
   // Fetch studies from backend on mount
   const fetchQueue = useCallback(async () => {
@@ -286,7 +287,7 @@ export default function Home() {
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   accept="image/jpeg, image/png"
                 />
-                <button className="px-3 py-1.5 bg-blue-950/40 hover:bg-blue-900/60 border border-blue-900/50 text-blue-400 text-[10px] font-mono font-bold rounded">
+                <button suppressHydrationWarning className="px-3 py-1.5 bg-blue-950/40 hover:bg-blue-900/60 border border-blue-900/50 text-blue-400 text-[10px] font-mono font-bold rounded">
                   + IMPORT NEW SCAN
                 </button>
               </div>
@@ -318,7 +319,6 @@ export default function Home() {
                 study={selectedStudy}
                 activeMode={activeMode}
                 pixelSpacingMm={pixelSpacingMm}
-                imageWidth={imageWidth}
                 brightness={brightness}
                 contrast={contrast}
                 sharpness={sharpness}
@@ -331,6 +331,7 @@ export default function Home() {
                 checklist={checklist}
                 onChecklistUpdate={handleChecklistUpdate}
                 imageWidth={imageWidth}
+                annoTrigger={annoTrigger}
               />
 
               {/* Patient Record Card */}
@@ -396,7 +397,8 @@ export default function Home() {
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({status: 'ACCEPTED'})
                       });
-                      alert("Study Accepted");
+                      fetchQueue();
+                      setSelectedStudy(null);
                     }}
                     onReject={async () => {
                       if (!selectedStudy) return;
@@ -405,8 +407,10 @@ export default function Home() {
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({status: 'REJECTED'})
                       });
-                      alert("Study Rejected");
+                      fetchQueue();
+                      setSelectedStudy(null);
                     }}
+                    onAnnotationsChanged={() => setAnnoTrigger(prev => prev + 1)}
                   />
                   
                   {/* Quantum circuit board visualization */}

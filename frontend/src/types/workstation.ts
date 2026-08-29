@@ -19,7 +19,7 @@ export interface Study {
   trueLabel?: string;
 }
 
-export type ToolMode = "SCAN" | "MEASURE" | "ANNOTATE" | "SEGMENT" | "EVIDENCE" | "QUANTUM" | "IMAGE";
+export type ToolMode = "SCAN" | "MEASURE" | "ANNOTATE" | "SEGMENT" | "EVIDENCE" | "QUANTUM" | "IMAGE" | "REPORT";
 
 export interface PipelineStage {
   id: string;
@@ -51,6 +51,20 @@ export interface ChecklistStep {
   label: string;
   status: ChecklistStatus;
   point?: MeasurementPoint;
+}
+
+export interface BoundingBox {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AnnotationData {
+  global_tags: string[];
+  boxes: BoundingBox[];
 }
 
 export interface IssueAnnotation {

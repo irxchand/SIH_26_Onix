@@ -45,9 +45,9 @@ def train_pca(embeddings: np.ndarray) -> PCA:
     pca.fit(embeddings)
     return pca
 
-def construct_quantum_kernel() -> FidelityQuantumKernel:
+def construct_quantum_kernel(n_features: int = constants.PCA_COMPONENTS) -> FidelityQuantumKernel:
     """Constructs a feature map and a FidelityQuantumKernel using current Qiskit API."""
-    feature_map = _get_feature_map(constants.PCA_COMPONENTS)
+    feature_map = _get_feature_map(n_features)
     sampler = Sampler()
     fidelity = ComputeUncompute(sampler=sampler)
     quantum_kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)

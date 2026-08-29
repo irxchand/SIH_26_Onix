@@ -73,6 +73,7 @@ class EvidenceItem(BaseModel):
     signal: str
     xPercent: float
     yPercent: float
+    note: Optional[str] = None
 
 
 class PredictionResponse(BaseModel):
@@ -114,12 +115,22 @@ class CalibrateRequest(BaseModel):
     sharpness: int
 
 class EvidenceNotesRequest(BaseModel):
+    id: str
     note: str
     xPercent: float
     yPercent: float
 
+class BoundingBox(BaseModel):
+    id: str
+    label: str
+    x: float
+    y: float
+    width: float
+    height: float
+
 class AnnotationRequest(BaseModel):
-    paths: List[str]
+    global_tags: List[str]
+    boxes: List[BoundingBox]
 
 class StatusRequest(BaseModel):
     status: StudyStatus

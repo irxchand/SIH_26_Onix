@@ -11,9 +11,19 @@ interface RightIntelligenceProps {
   activeMode: ToolMode;
   onAccept: () => void;
   onReject: () => void;
+  onAnnotationsChanged?: () => void;
 }
 
-export default function RightIntelligence({ study, results, loading, checklist, activeMode, onAccept, onReject }: RightIntelligenceProps) {
+export default function RightIntelligence({ 
+  study, 
+  results, 
+  loading, 
+  checklist, 
+  activeMode, 
+  onAccept, 
+  onReject,
+  onAnnotationsChanged 
+}: RightIntelligenceProps) {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [aiReport, setAiReport] = useState<string | null>(null);
@@ -110,8 +120,8 @@ export default function RightIntelligence({ study, results, loading, checklist, 
         </div>
       )}
 
-      {/* AI REPORT GENERATOR (ANNOTATE MODE) */}
-      {activeMode === "ANNOTATE" && (
+      {/* AI REPORT GENERATOR (REPORT MODE) */}
+      {activeMode === "REPORT" && (
         <div className="border border-gray-800 rounded-lg p-3 bg-[#0d1117] space-y-3">
           <span className="text-[10px] text-blue-400 font-bold tracking-widest block border-b border-gray-850 pb-2">
             AI REPORT GENERATOR
@@ -131,6 +141,117 @@ export default function RightIntelligence({ study, results, loading, checklist, 
               {aiReport}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ANNOTATION CONTROLS (ANNOTATE MODE) */}
+      {activeMode === "ANNOTATE" && (
+        <div className="border border-gray-800 rounded-lg p-3 bg-[#0d1117] space-y-3">
+          <span className="text-[10px] text-blue-400 font-bold tracking-widest block border-b border-gray-850 pb-2">
+            ML ANNOTATION TOOL
+          </span>
+          <p className="text-[10px] text-gray-500">
+            Draw bounding boxes on the canvas. Assign image-level classifications below.
+          </p>
+          <div className="space-y-2">
+            <span className="text-[9px] text-gray-500 font-bold block">GLOBAL IMAGE CLASSIFICATION</span>
+            <div className="flex space-x-2">
+              <button 
+                className="flex-1 bg-green-900/30 hover:bg-green-900/60 text-green-400 border border-green-900 py-1 rounded text-[10px] transition-colors"
+                onClick={async () => {
+                  if (!study) return;
+                  try {
+                    const res = await fetch(`http://localhost:8000/api/v1/studies/${study.id}/annotations`);
+                    const data = await res.json();
+                    const updatedBoxes = data.boxes || [];
+                    await fetch(`http://localhost:8000/api/v1/studies/${study.id}/annotations`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ boxes: updatedBoxes, global_tags: ["NORMAL"] })
+                    });
+                    onAnnotationsChanged?.();
+                  } catch (e) {
+                    console.error("Update failed", e);
+                  }
+                }}
+              >
+                NORMAL
+              </button>
+              <button 
+                className="flex-1 bg-red-900/30 hover:bg-red-900/60 text-red-400 border border-red-900 py-1 rounded text-[10px] transition-colors"
+                onClick={async () => {
+                  if (!study) return;
+                  try {
+                    const res = await fetch(`http://localhost:8000/api/v1/studies/${study.id}/annotations`);
+                    const data = await res.json();
+                    const updatedBoxes = data.boxes || [];
+                    await fetch(`http://localhost:8000/api/v1/studies/${study.id}/annotations`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ boxes: updatedBoxes, global_tags: ["TUBERCULOSIS"] })
+                    });
+                    onAnnotationsChanged?.();
+                  } catch (e) {
+                    console.error("Update failed", e);
+                  }
+                }}
+              >
+                TUBERCULOSIS
+              </button>
+            </div>
+          </div>
+          <button 
+            className="w-full bg-purple-900/40 hover:bg-purple-900/60 text-purple-400 border border-purple-900 py-1.5 rounded text-[10px] font-bold transition-colors mt-2"
+            onClick={async () => {
+              if (!study || !results) return;
+              try {
+                // Generate bounding boxes based on the model's CAM evidence
+                const newBoxes = (results.evidence || []).map(ev => ({
+                    id: ev.id,
+                    x: ev.xPercent,
+                    y: ev.yPercent,
+                    width: 15, // default bounding box size
+                    height: 15,
+                    label: "UNKNOWN"
+                }));
+                const res = await fetch(`http://localhost:8000/api/v1/studies/${study.id}/annotations`);
+                const data = await res.json();
+                const existingBoxes = data.boxes || [];
+                const mergedBoxes = [...existingBoxes, ...newBoxes];
+                await fetch(`http://localhost:8000/api/v1/studies/${study.id}/annotations`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ boxes: mergedBoxes, global_tags: data.global_tags || [] })
+                });
+                onAnnotationsChanged?.();
+              } catch (e) {
+                console.error("Update failed", e);
+                alert("Failed to generate ML bounding boxes.");
+              }
+            }}
+          >
+            GENERATE ML BOUNDING BOXES
+          </button>
+          <button 
+            className="w-full bg-blue-900/40 hover:bg-blue-900/60 text-blue-400 border border-blue-900 py-1.5 rounded text-[10px] font-bold transition-colors mt-2"
+            onClick={async () => {
+              if (!study) return;
+              try {
+                const res = await fetch(`http://localhost:8000/api/v1/studies/${study.id}/annotations/export`);
+                const data = await res.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `annotations_${study.id}.json`;
+                a.click();
+              } catch (e) {
+                console.error("Export failed", e);
+              }
+            }}
+          >
+            EXPORT ML LABELS (JSON)
+          </button>
         </div>
       )}
 

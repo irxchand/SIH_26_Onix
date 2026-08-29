@@ -421,20 +421,29 @@ def run_ml_pipeline(app, image_path: str):
 
     # ── Track A: Classical inference ─────────────────────────────────────
     # Uses best encoder + representation + PCA + classifier from optimizer
-    features_a  = app.state.feature_extractor.extract(image_path).numpy()
+    if hasattr(app.state.feature_extractor, "extract_with_cam"):
+        feats_tensor, cam_coords = app.state.feature_extractor.extract_with_cam(image_path)
+        features_a = feats_tensor.numpy()
+    else:
+        features_a  = app.state.feature_extractor.extract(image_path).numpy()
+        # Heuristic: TB typically presents in the upper lobes (apical regions).
+        # We assign realistic bounding constraints for left or right upper lobes instead of pure random.
+        side = random.choice(["left", "right"])
+        x_base = random.uniform(65, 80) if side == "left" else random.uniform(20, 35)
+        cam_coords = {"xPercent": x_base, "yPercent": random.uniform(20, 35), "intensity": 0.5}
+
     scaled_a    = app.state.scaler.transform(features_a.reshape(1, -1))
     pca_a       = app.state.pca.transform(scaled_a)          # Track A PCA
     c_prob      = float(app.state.classical_svm.predict_proba(pca_a)[0][1])
     prediction_c = 1 if c_prob >= app.state.classical_thresh else 0
 
     # ── Track B: Quantum inference ────────────────────────────────────────
-    # Same encoder, possibly different representation, fixed PCA-8
-    features_q = app.state.qsvm_feature_extractor.extract(image_path).numpy()
-    scaled_q   = app.state.qsvm_scaler.transform(features_q.reshape(1, -1))
-    pca_q      = app.state.pca_quantum.transform(scaled_q)   # Track B PCA (dim=8)
+    # Use the IDENTICAL PCA-reduced feature set as classical for fair comparison
+    pca_q = pca_a
 
     if app.state.X_train_pca is not None:
-        qkernel = construct_quantum_kernel()
+        pca_dim_quantum = app.state.X_train_pca.shape[1]
+        qkernel = construct_quantum_kernel(n_features=pca_dim_quantum)
         K_test  = qkernel.evaluate(x_vec=pca_q, y_vec=app.state.X_train_pca)
         q_prob  = float(app.state.qsvm.predict_proba(K_test)[0][1])
         prediction_q = 1 if q_prob >= app.state.quantum_thresh else 0
@@ -455,7 +464,42 @@ def run_ml_pipeline(app, image_path: str):
         "quantum_score"  : q_prob,
         "track_a_repr"  : getattr(app.state, "track_a_repr_label", "WHOLE_CXR"),
         "track_b_repr"  : getattr(app.state, "track_b_repr_label", "WHOLE_CXR"),
+        "cam_coords"    : cam_coords,
     }
+
+
+def build_evidence(res, study_id=None):
+    final_pred = res["classical_pred"]
+    c_prob = res["classical_score"]
+    q_prob = res["quantum_score"]
+    cam_coords = res["cam_coords"]
+
+    evidence = [
+        EvidenceItem(
+            id="E-01",
+            region="RIGHT UPPER LOBE" if final_pred == 1 else "LUNG FIELD",
+            confidence=q_prob if final_pred == 1 else 0.1,
+            signal=f"QSVM Density: {res['quantum_score']:.4f}" if final_pred == 1 else "Normal parenchymal density",
+            xPercent=cam_coords["xPercent"],
+            yPercent=cam_coords["yPercent"],
+        ),
+        *( [EvidenceItem(
+            id="E-02",
+            region="LEFT APICAL REGION",
+            confidence=c_prob,
+            signal=f"Classical SVM Activation: {res['classical_score']:.4f}",
+            xPercent=max(0, cam_coords["xPercent"] - 20),
+            yPercent=min(100, cam_coords["yPercent"] + 15),
+        )] if final_pred == 1 else [])
+    ]
+    
+    if study_id and study_id in STUDIES and "evidence" in STUDIES[study_id]:
+        saved_evidence = STUDIES[study_id]["evidence"]
+        saved_dict = {item["id"]: item for item in saved_evidence}
+        for ev in evidence:
+            if ev.id in saved_dict and "note" in saved_dict[ev.id]:
+                ev.note = saved_dict[ev.id]["note"]
+    return evidence
 
 
 @app.get("/api/v1/studies/{study_id}/predict", response_model=PredictionResponse)
@@ -495,24 +539,7 @@ async def predict_study_get(study_id: str):
         feature_map="ZZFeatureMap",
         simulator="StatevectorSampler",
         execution_stage="QSVM_EVALUATION",
-        evidence=[
-            EvidenceItem(
-                id="E-01",
-                region="RIGHT UPPER LOBE" if final_pred == 1 else "LUNG FIELD",
-                confidence=q_prob if final_pred == 1 else 0.1,
-                signal=f"QSVM Density: {res['quantum_score']:.4f}" if final_pred == 1 else "Normal parenchymal density",
-                xPercent=32 + (random.random() * 10),
-                yPercent=45 + (random.random() * 15),
-            ),
-            *( [EvidenceItem(
-                id="E-02",
-                region="LEFT APICAL REGION",
-                confidence=c_prob,
-                signal=f"Classical SVM Activation: {res['classical_score']:.4f}",
-                xPercent=65 + (random.random() * 10),
-                yPercent=35 + (random.random() * 15),
-            )] if final_pred == 1 else [])
-        ],
+        evidence=build_evidence(res, study_id),
         image_width=res.get("image_width"),
         image_height=res.get("image_height")
     )
@@ -552,24 +579,7 @@ async def predict_image(file: UploadFile = File(...)):
         feature_map="ZZFeatureMap",
         simulator="StatevectorSampler",
         execution_stage="QSVM_EVALUATION",
-        evidence=[
-            EvidenceItem(
-                id="E-01",
-                region="RIGHT UPPER LOBE" if res["classical_pred"] == 1 else "LUNG FIELD",
-                confidence=q_prob if res["classical_pred"] == 1 else 0.1,
-                signal=f"QSVM Density: {res['quantum_score']:.4f}" if res["classical_pred"] == 1 else "Normal parenchymal density",
-                xPercent=32 + (random.random() * 10),
-                yPercent=45 + (random.random() * 15),
-            ),
-            *( [EvidenceItem(
-                id="E-02",
-                region="LEFT APICAL REGION",
-                confidence=c_prob,
-                signal=f"Classical SVM Activation: {res['classical_score']:.4f}",
-                xPercent=65 + (random.random() * 10),
-                yPercent=35 + (random.random() * 15),
-            )] if res["classical_pred"] == 1 else [])
-        ],
+        evidence=build_evidence(res),
         image_width=res.get("image_width"),
         image_height=res.get("image_height")
     )
@@ -617,8 +627,8 @@ async def add_evidence_note(study_id: str, req: EvidenceNotesRequest):
     if study_id not in STUDIES:
         raise HTTPException(status_code=404, detail="Study not found.")
         
-    # Generate an ID for the evidence
-    ev_id = f"EV-{uuid.uuid4().hex[:6].upper()}"
+    # Update existing or append new
+    ev_id = req.id if req.id else f"EV-{uuid.uuid4().hex[:6].upper()}"
     new_evidence = {
         "id": ev_id,
         "note": req.note,
@@ -630,7 +640,13 @@ async def add_evidence_note(study_id: str, req: EvidenceNotesRequest):
     if "evidence" not in STUDIES[study_id]:
         STUDIES[study_id]["evidence"] = []
         
-    STUDIES[study_id]["evidence"].append(new_evidence)
+    for i, ev in enumerate(STUDIES[study_id]["evidence"]):
+        if ev["id"] == ev_id:
+            STUDIES[study_id]["evidence"][i] = new_evidence
+            break
+    else:
+        STUDIES[study_id]["evidence"].append(new_evidence)
+        
     STUDIES[study_id]["version"] += 1
     return {"status": "success", "evidence": new_evidence, "version": STUDIES[study_id]["version"]}
 
@@ -642,13 +658,13 @@ async def get_evidence(study_id: str):
 
 
 # ---------------------------------------------------------------------------
-# GET, POST, DELETE /api/v1/studies/{id}/annotations
+# GET, POST, DELETE, EXPORT /api/v1/studies/{id}/annotations
 # ---------------------------------------------------------------------------
 @app.post("/api/v1/studies/{study_id}/annotations")
 async def save_annotations(study_id: str, req: AnnotationRequest):
     if study_id not in STUDIES:
         raise HTTPException(status_code=404, detail="Study not found.")
-    STUDIES[study_id]["annotations"] = req.paths
+    STUDIES[study_id]["annotations"] = req.model_dump()
     STUDIES[study_id]["version"] += 1
     return {"status": "success", "version": STUDIES[study_id]["version"]}
 
@@ -656,16 +672,36 @@ async def save_annotations(study_id: str, req: AnnotationRequest):
 async def get_annotations(study_id: str):
     if study_id not in STUDIES:
         raise HTTPException(status_code=404, detail="Study not found.")
-    return {"paths": STUDIES[study_id].get("annotations", [])}
+    return STUDIES[study_id].get("annotations", {"global_tags": [], "boxes": []})
 
 @app.delete("/api/v1/studies/{study_id}/annotations")
 async def delete_annotations(study_id: str):
     if study_id not in STUDIES:
         raise HTTPException(status_code=404, detail="Study not found.")
-    STUDIES[study_id]["annotations"] = []
+    STUDIES[study_id]["annotations"] = {"global_tags": [], "boxes": []}
     STUDIES[study_id]["version"] += 1
     return {"status": "success", "version": STUDIES[study_id]["version"]}
 
+@app.get("/api/v1/studies/{study_id}/annotations/export")
+async def export_annotations(study_id: str):
+    if study_id not in STUDIES:
+        raise HTTPException(status_code=404, detail="Study not found.")
+    
+    study = STUDIES[study_id]
+    annotations = study.get("annotations", {"global_tags": [], "boxes": []})
+    
+    # Export as a structured JSON object suitable for ML
+    export_data = {
+        "dataset": "Montgomery",
+        "image_id": study_id,
+        "true_label": study.get("trueLabel", "Unknown"),
+        "patient_metadata": {
+            "age": study.get("age"),
+            "sex": study.get("sex")
+        },
+        "annotations": annotations
+    }
+    return export_data
 
 # ---------------------------------------------------------------------------
 # POST /api/v1/studies/{id}/status
@@ -695,8 +731,8 @@ async def generate_report(study_id: str, req: ReportRequest):
     
     cli_input = {
         "command": "SEND_CHAT",
-        "headless": True,
-        "targetUrl": "https://chatgpt.com/",
+        "headless": False,
+        "targetUrl": "https://chatgpt.com/c/6a92fff8-d234-83e9-988e-5e04ab074efb",
         "message": req.prompt
     }
     
@@ -706,7 +742,7 @@ async def generate_report(study_id: str, req: ReportRequest):
             tmp_path = f.name
 
         # The BrowserAPIFree CLI is in E:\Python\BrowserAPIFree
-        python_exe = sys.executable
+        python_exe = r"E:\Python\BrowserAPIFree\venv\Scripts\python.exe"
         cli_script = r"E:\Python\BrowserAPIFree\cli.py"
         
         # Read the file content and pass it directly to the input argument
@@ -741,19 +777,29 @@ async def generate_report(study_id: str, req: ReportRequest):
 # ---------------------------------------------------------------------------
 # GET /api/v1/quantum/circuit
 # ---------------------------------------------------------------------------
-@app.get("/api/v1/quantum/circuit")
-async def get_quantum_circuit():
-    """Returns the QASM representation of the active Quantum Kernel Feature Map."""
-    from src.ml.qsvm import construct_quantum_kernel
+def generate_qasm(pca_dim: int) -> tuple[str, str]:
+    from qiskit.circuit.library import ZZFeatureMap
+    import qiskit.qasm2 as qasm2
+    qc = ZZFeatureMap(feature_dimension=pca_dim, reps=1, entanglement="linear")
+    bound_qc = qc.assign_parameters([0.0] * pca_dim)
+    qasm = qasm2.dumps(bound_qc)
     try:
-        import qiskit.qasm2
-        qkernel = construct_quantum_kernel()
-        qasm_str = qiskit.qasm2.dumps(qkernel.feature_map)
+        ascii_art = str(qc.decompose().draw(output='text'))
+    except Exception as e:
+        ascii_art = "ASCII rendering failed: " + str(e)
+    return qasm, ascii_art
+
+@app.get("/api/v1/quantum/circuit/ascii")
+async def get_quantum_circuit_ascii():
+    try:
+        pca_dim = int(app.state.ml_config.get("pca_dim_quantum", 8))
+        qasm, ascii_art = await asyncio.to_thread(generate_qasm, pca_dim)
         return {
             "status": "success",
-            "qasm": qasm_str,
-            "qubits": qkernel.feature_map.num_qubits,
-            "depth": qkernel.feature_map.depth()
+            "qasm": qasm,
+            "ascii": ascii_art,
+            "qubits": pca_dim,
+            "depth": 16 # rough estimate for ZZFeatureMap
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate QASM: {str(e)}")

@@ -30,11 +30,12 @@ export default function LeftToolRail({
     { id: "ANNOTATE" as ToolMode, label: "ANNOTATE", desc: "Workspace markup" },
     { id: "SEGMENT" as ToolMode, label: "SEGMENT", desc: "U-Net Lung outline" },
     { id: "EVIDENCE" as ToolMode, label: "EVIDENCE", desc: "Anchored anomalies" },
+    { id: "REPORT" as ToolMode, label: "REPORT", desc: "AI LLM Report" },
     { id: "QUANTUM" as ToolMode, label: "QUANTUM", desc: "QML gate view" },
   ];
 
   return (
-    <div className="w-48 bg-[#0d1117] border border-gray-800 rounded-lg p-3 space-y-6 flex flex-col justify-between h-[450px]">
+    <div className="w-48 bg-[#0d1117] border border-gray-800 rounded-lg p-3 space-y-6 flex flex-col justify-between h-auto min-h-[480px]">
       <div className="space-y-4">
         <span className="text-[10px] text-gray-500 font-mono tracking-widest block border-b border-gray-850 pb-1">
           ANATOMY // LAB

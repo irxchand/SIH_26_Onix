@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ToolMode, MeasurementPoint, EvidenceItem, Study, ChecklistStep } from "../types/workstation";
+import { ToolMode, MeasurementPoint, EvidenceItem, Study, ChecklistStep, BoundingBox } from "../types/workstation";
 
 interface XrayCanvasProps {
   study: Study | null;
@@ -20,6 +20,7 @@ interface XrayCanvasProps {
   checklist: ChecklistStep[];
   onChecklistUpdate: (updatedChecklist: ChecklistStep[]) => void;
   imageHeight?: number;
+  annoTrigger?: number;
 }
 
 export default function XrayCanvas({
@@ -39,6 +40,7 @@ export default function XrayCanvas({
   checklist,
   onChecklistUpdate,
   imageHeight,
+  annoTrigger,
 }: XrayCanvasProps) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -49,8 +51,10 @@ export default function XrayCanvas({
   
   // Annotation states
   const [isDrawing, setIsDrawing] = useState(false);
-  const [currentPath, setCurrentPath] = useState<string>("");
-  const [drawnPaths, setDrawnPaths] = useState<string[]>([]);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [currentBox, setCurrentBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [drawnBoxes, setDrawnBoxes] = useState<BoundingBox[]>([]);
+  const [globalTags, setGlobalTags] = useState<string[]>([]);
   
   // Evidence dragging states
   const [localEvidence, setLocalEvidence] = useState<EvidenceItem[]>(evidence);
@@ -80,8 +84,18 @@ export default function XrayCanvas({
           }
         })
         .catch(err => console.error("Failed to fetch segmentation:", err));
+    } else if (activeMode === "ANNOTATE" && study) {
+      fetch(`http://localhost:8000/api/v1/studies/${study.id}/annotations`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) {
+            setDrawnBoxes(data.boxes || []);
+            setGlobalTags(data.global_tags || []);
+          }
+        })
+        .catch(err => console.error("Failed to fetch annotations:", err));
     }
-  }, [activeMode, study, segmentationMode]);
+  }, [activeMode, study, segmentationMode, annoTrigger]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
@@ -100,7 +114,8 @@ export default function XrayCanvas({
       setIsDrawing(true);
       const fx = ((e.clientX - rect.left) / rect.width) * 100;
       const fy = ((e.clientY - rect.top) / rect.height) * 100;
-      setCurrentPath(`${fx},${fy}`);
+      setDragStart({ x: fx, y: fy });
+      setCurrentBox({ x: fx, y: fy, width: 0, height: 0 });
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
     }
   };
@@ -112,10 +127,15 @@ export default function XrayCanvas({
     const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
     setMousePos({ x, y });
 
-    if (activeMode === "ANNOTATE" && isDrawing) {
+    if (activeMode === "ANNOTATE" && isDrawing && dragStart) {
        const fx = ((e.clientX - rect.left) / rect.width) * 100;
        const fy = ((e.clientY - rect.top) / rect.height) * 100;
-       setCurrentPath(prev => `${prev} ${fx},${fy}`);
+       setCurrentBox({
+         x: Math.min(dragStart.x, fx),
+         y: Math.min(dragStart.y, fy),
+         width: Math.abs(fx - dragStart.x),
+         height: Math.abs(fy - dragStart.y)
+       });
     } else if (activeMode === "EVIDENCE" && draggingPin) {
        setLocalEvidence(prev => prev.map(pin => pin.id === draggingPin ? { ...pin, xPercent: x, yPercent: y } : pin));
     }
@@ -124,15 +144,21 @@ export default function XrayCanvas({
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (activeMode === "ANNOTATE" && isDrawing) {
        setIsDrawing(false);
-       if (currentPath) {
-         const updated = [...drawnPaths, currentPath];
-         setDrawnPaths(updated);
-         setCurrentPath("");
+       if (currentBox && currentBox.width > 1 && currentBox.height > 1) {
+         const newBox: BoundingBox = {
+           id: `BOX-${Date.now()}`,
+           label: "UNKNOWN",
+           ...currentBox
+         };
+         const updated = [...drawnBoxes, newBox];
+         setDrawnBoxes(updated);
+         setDragStart(null);
+         setCurrentBox(null);
          if (study) {
             fetch(`http://localhost:8000/api/v1/studies/${study.id}/annotations`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ paths: updated })
+                body: JSON.stringify({ boxes: updated, global_tags: globalTags })
             }).then(res => {
                 if (res.status === 409) alert("Conflict: Another user has modified this study.");
             }).catch(console.error);
@@ -175,7 +201,99 @@ export default function XrayCanvas({
       {/* Dynamic Instruction Bar */}
       <div className="bg-[#0d1117] border border-gray-800 rounded px-3 py-1.5 text-[10px] font-mono text-gray-400 flex items-center justify-between">
         <span className="flex items-center space-x-2">
-          {activeMode === "MEASURE" && `[CALIPER MODE]: Click to set landmarks (${getCompletedPoints().length}/${checklist.length} points set)`}
+          {activeMode === "MEASURE" && (
+            <div className="flex items-center space-x-4">
+              <span>{`[CALIPER MODE]: Click to set landmarks (${getCompletedPoints().length}/${checklist.length} points set)`}</span>
+              <button 
+                onClick={async () => {
+                  if (!study) return;
+                  try {
+                    const res = await fetch(`http://localhost:8000/api/v1/studies/${study.id}/segmentation?mode=ground_truth`);
+                    let data = res.ok ? await res.json() : null;
+                    if (!data || !data.leftLung || !data.rightLung) {
+                      const res2 = await fetch(`http://localhost:8000/api/v1/studies/${study.id}/segmentation?mode=automated`);
+                      data = res2.ok ? await res2.json() : null;
+                    }
+
+                    let autoPoints = [
+                      { id: "spine_top", x: 50, y: 30 },
+                      { id: "spine_bottom", x: 50, y: 70 },
+                      { id: "heart_right", x: 45, y: 50 },
+                      { id: "heart_left", x: 55, y: 50 },
+                      { id: "chest_right", x: 30, y: 50 },
+                      { id: "chest_left", x: 70, y: 50 }
+                    ];
+
+                    if (data && data.leftLung && data.rightLung) {
+                      const parseSvgPath = (path: string) => {
+                        const matches = path.match(/[-+]?[0-9]*\.?[0-9]+/g);
+                        if (!matches) return [];
+                        const coords: { x: number; y: number }[] = [];
+                        for (let i = 0; i < matches.length; i += 2) {
+                          const x = parseFloat(matches[i]);
+                          const y = parseFloat(matches[i + 1]);
+                          if (!isNaN(x) && !isNaN(y)) {
+                            coords.push({ x, y });
+                          }
+                        }
+                        return coords;
+                      };
+
+                      const leftCoords = parseSvgPath(data.leftLung);
+                      const rightCoords = parseSvgPath(data.rightLung);
+
+                      if (leftCoords.length > 0 && rightCoords.length > 0) {
+                        const rightXs = rightCoords.map(c => c.x);
+                        const rightYs = rightCoords.map(c => c.y);
+                        const minRightX = Math.min(...rightXs);
+                        const maxRightX = Math.max(...rightXs);
+                        
+                        const leftXs = leftCoords.map(c => c.x);
+                        const leftYs = leftCoords.map(c => c.y);
+                        const minLeftX = Math.min(...leftXs);
+                        const maxLeftX = Math.max(...leftXs);
+
+                        const allYs = [...rightYs, ...leftYs];
+                        const minY = Math.min(...allYs);
+                        const maxY = Math.max(...allYs);
+
+                        const chestRightY = rightCoords.find(c => c.x === minRightX)?.y || 65;
+                        const chestLeftY = leftCoords.find(c => c.x === maxLeftX)?.y || 65;
+                        const heartRightY = rightCoords.find(c => c.x === maxRightX)?.y || 60;
+                        const heartLeftY = leftCoords.find(c => c.x === minLeftX)?.y || 60;
+
+                        const chestY = (chestRightY + chestLeftY) / 2;
+                        const heartY = (heartRightY + heartLeftY) / 2;
+
+                        const spineX = (maxRightX + minLeftX) / 2;
+
+                        autoPoints = [
+                          { id: "spine_top", x: spineX, y: Math.max(5, minY - 3) },
+                          { id: "spine_bottom", x: spineX, y: Math.min(95, maxY + 5) },
+                          { id: "heart_right", x: maxRightX, y: heartY },
+                          { id: "heart_left", x: minLeftX, y: heartY },
+                          { id: "chest_right", x: minRightX, y: chestY },
+                          { id: "chest_left", x: maxLeftX, y: chestY }
+                        ];
+                      }
+                    }
+
+                    const updated = checklist.map(item => {
+                      const ap = autoPoints.find(p => p.id === item.id);
+                      return ap ? { ...item, status: "completed" as const, point: { x: ap.x, y: ap.y } } : item;
+                    });
+                    onChecklistUpdate(updated);
+
+                  } catch (err) {
+                    console.error("Auto-measure failed:", err);
+                  }
+                }}
+                className="px-2 py-0.5 bg-blue-900/30 text-blue-400 border border-blue-800 rounded hover:bg-blue-800/50 transition-colors"
+              >
+                AUTO-MEASURE
+              </button>
+            </div>
+          )}
           {activeMode === "SEGMENT" && (
             <span className="flex items-center space-x-2">
               <span>[SEGMENTATION]:</span>
@@ -302,14 +420,32 @@ export default function XrayCanvas({
                 </>
               )}
               
-              {/* FREEHAND ANNOTATIONS */}
+              {/* ML BOUNDING BOX ANNOTATIONS */}
               {activeMode === "ANNOTATE" && (
                 <>
-                  {drawnPaths.map((pathStr, i) => (
-                    <polyline key={i} points={pathStr} fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {drawnBoxes.map((box) => (
+                    <g key={box.id}>
+                      <rect 
+                        x={`${box.x}%`} y={`${box.y}%`} 
+                        width={`${box.width}%`} height={`${box.height}%`} 
+                        fill="rgba(59, 130, 246, 0.2)" 
+                        stroke="#3B82F6" strokeWidth="2" 
+                      />
+                      <text 
+                        x={`${box.x}%`} y={`${box.y - 1}%`} 
+                        fill="#3B82F6" fontSize="10" fontFamily="monospace"
+                      >
+                        {box.label}
+                      </text>
+                    </g>
                   ))}
-                  {currentPath && (
-                    <polyline points={currentPath} fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {currentBox && (
+                    <rect 
+                      x={`${currentBox.x}%`} y={`${currentBox.y}%`} 
+                      width={`${currentBox.width}%`} height={`${currentBox.height}%`} 
+                      fill="rgba(59, 130, 246, 0.4)" 
+                      stroke="#3B82F6" strokeWidth="2" strokeDasharray="4"
+                    />
                   )}
                 </>
               )}
