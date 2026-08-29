@@ -87,35 +87,35 @@ class PredictionResponse(BaseModel):
     execution_stage: str = "CACHED_BENCHMARK"
     evidence: List[EvidenceItem] = []
 
+class MeasurementPointRequest(BaseModel):
+    x: int
+    y: int
+    
+class ChecklistItemRequest(BaseModel):
+    id: str
+    label: str
+    status: str
+    point: Optional[MeasurementPointRequest] = None
 
-class Point(BaseModel):
-    x: float
-    y: float
+class MeasurementRequest(BaseModel):
+    points: List[ChecklistItemRequest]
+    hDistMm: float
+    cDistMm: float
+    ratio: float
+    note: Optional[str] = None
 
 class CalibrateRequest(BaseModel):
     brightness: int
     contrast: int
     sharpness: int
 
-class MeasurementRequest(BaseModel):
-    type: str
-    points: List[Point]
-
-    @classmethod
-    def validate_ctr(cls, values):
-        if values.get('type') == 'CTR' and len(values.get('points', [])) < 6:
-            raise ValueError("CTR measurement requires at least 6 points")
-        return values
-
-class EvidenceRequest(BaseModel):
-    region: str
-    signal: str
+class EvidenceNotesRequest(BaseModel):
+    note: str
     xPercent: float
     yPercent: float
 
 class AnnotationRequest(BaseModel):
-    path: str
-    color: str
+    paths: List[str]
 
 class StatusRequest(BaseModel):
     status: StudyStatus

@@ -25,6 +25,11 @@ from src.backend.schemas import (
     SegmentationResponse,
     PredictionResponse,
     EvidenceItem,
+    CalibrateRequest,
+    MeasurementRequest,
+    EvidenceNotesRequest,
+    AnnotationRequest,
+    StatusRequest,
 )
 
 # ---------------------------------------------------------------------------
@@ -120,6 +125,13 @@ async def lifespan(app: FastAPI):
 
     # Seed studies
     for s in _SEED_STUDIES:
+        s["version"] = 1
+        s["calibration"] = {"brightness": 100, "contrast": 100, "sharpness": 100}
+        s["measurements"] = None
+        s["annotations"] = []
+        # Keep existing evidence if any, else []
+        if "evidence" not in s:
+            s["evidence"] = []
         STUDIES[s["id"]] = s
 
     print(f"[STARTUP] Seeded {len(STUDIES)} studies into in-memory store.")
@@ -273,6 +285,11 @@ async def upload_image(file: UploadFile = File(...)):
         "history": None,
         "comments": "Uploaded via workstation",
         "attending": None,
+        "version": 1,
+        "calibration": {"brightness": 100, "contrast": 100, "sharpness": 100},
+        "measurements": None,
+        "annotations": [],
+        "evidence": [],
     }
 
     STUDIES[study_id] = new_study
@@ -474,57 +491,106 @@ async def predict_image(file: UploadFile = File(...)):
     )
 
 # ---------------------------------------------------------------------------
-# Phase 3: Interactive Workstation Endpoints
 # ---------------------------------------------------------------------------
-
-from src.backend.schemas import (
-    CalibrateRequest,
-    MeasurementRequest,
-    EvidenceRequest,
-    AnnotationRequest,
-    StatusRequest
-)
-
+# POST /api/v1/studies/{id}/calibrate
+# ---------------------------------------------------------------------------
 @app.post("/api/v1/studies/{study_id}/calibrate")
-async def calibrate_study(study_id: str, request: CalibrateRequest):
+async def calibrate_study(study_id: str, req: CalibrateRequest):
     if study_id not in STUDIES:
-        raise HTTPException(status_code=404, detail="Study not found")
-    # Save calibration settings to study (in a real app, save to DB)
-    STUDIES[study_id]["calibration"] = request.dict()
-    return {"status": "success", "calibration": request.dict()}
+        raise HTTPException(status_code=404, detail="Study not found.")
+    STUDIES[study_id]["calibration"] = req.dict()
+    STUDIES[study_id]["version"] += 1
+    return {"status": "success", "calibration": req.dict(), "version": STUDIES[study_id]["version"]}
 
+
+# ---------------------------------------------------------------------------
+# GET, POST /api/v1/studies/{id}/measurements
+# ---------------------------------------------------------------------------
 @app.post("/api/v1/studies/{study_id}/measurements")
-async def add_measurement(study_id: str, request: MeasurementRequest):
+async def save_measurements(study_id: str, req: MeasurementRequest):
     if study_id not in STUDIES:
-        raise HTTPException(status_code=404, detail="Study not found")
-    
-    # Validation logic
-    if request.type == 'CTR' and len(request.points) < 6:
-        raise HTTPException(status_code=422, detail="CTR measurement requires at least 6 points")
+        raise HTTPException(status_code=404, detail="Study not found.")
         
-    measurements = STUDIES[study_id].setdefault("measurements", [])
-    measurements.append(request.dict())
-    return {"status": "success", "measurement": request.dict()}
+    if len(req.points) < 6:
+        raise HTTPException(status_code=422, detail="Measurement requires at least 6 points.")
+        
+    STUDIES[study_id]["measurements"] = req.dict()
+    STUDIES[study_id]["version"] += 1
+    return {"status": "success", "version": STUDIES[study_id]["version"]}
 
+@app.get("/api/v1/studies/{study_id}/measurements")
+async def get_measurements(study_id: str):
+    if study_id not in STUDIES:
+        raise HTTPException(status_code=404, detail="Study not found.")
+    return STUDIES[study_id].get("measurements")
+
+
+# ---------------------------------------------------------------------------
+# GET, POST /api/v1/studies/{id}/evidence
+# ---------------------------------------------------------------------------
 @app.post("/api/v1/studies/{study_id}/evidence")
-async def add_evidence(study_id: str, request: EvidenceRequest):
+async def add_evidence_note(study_id: str, req: EvidenceNotesRequest):
     if study_id not in STUDIES:
-        raise HTTPException(status_code=404, detail="Study not found")
-    evidence = STUDIES[study_id].setdefault("evidence_pins", [])
-    evidence.append(request.dict())
-    return {"status": "success", "evidence": request.dict()}
+        raise HTTPException(status_code=404, detail="Study not found.")
+        
+    # Generate an ID for the evidence
+    ev_id = f"EV-{uuid.uuid4().hex[:6].upper()}"
+    new_evidence = {
+        "id": ev_id,
+        "note": req.note,
+        "xPercent": req.xPercent,
+        "yPercent": req.yPercent,
+        "timestamp": time.time()
+    }
+    
+    if "evidence" not in STUDIES[study_id]:
+        STUDIES[study_id]["evidence"] = []
+        
+    STUDIES[study_id]["evidence"].append(new_evidence)
+    STUDIES[study_id]["version"] += 1
+    return {"status": "success", "evidence": new_evidence, "version": STUDIES[study_id]["version"]}
 
+@app.get("/api/v1/studies/{study_id}/evidence")
+async def get_evidence(study_id: str):
+    if study_id not in STUDIES:
+        raise HTTPException(status_code=404, detail="Study not found.")
+    return {"evidence": STUDIES[study_id].get("evidence", [])}
+
+
+# ---------------------------------------------------------------------------
+# GET, POST, DELETE /api/v1/studies/{id}/annotations
+# ---------------------------------------------------------------------------
 @app.post("/api/v1/studies/{study_id}/annotations")
-async def add_annotation(study_id: str, request: AnnotationRequest):
+async def save_annotations(study_id: str, req: AnnotationRequest):
     if study_id not in STUDIES:
-        raise HTTPException(status_code=404, detail="Study not found")
-    annotations = STUDIES[study_id].setdefault("annotations", [])
-    annotations.append(request.dict())
-    return {"status": "success", "annotation": request.dict()}
+        raise HTTPException(status_code=404, detail="Study not found.")
+    STUDIES[study_id]["annotations"] = req.paths
+    STUDIES[study_id]["version"] += 1
+    return {"status": "success", "version": STUDIES[study_id]["version"]}
 
-@app.post("/api/v1/studies/{study_id}/status")
-async def update_status(study_id: str, request: StatusRequest):
+@app.get("/api/v1/studies/{study_id}/annotations")
+async def get_annotations(study_id: str):
     if study_id not in STUDIES:
-        raise HTTPException(status_code=404, detail="Study not found")
-    STUDIES[study_id]["status"] = request.status
-    return {"status": "success", "new_status": request.status}
+        raise HTTPException(status_code=404, detail="Study not found.")
+    return {"paths": STUDIES[study_id].get("annotations", [])}
+
+@app.delete("/api/v1/studies/{study_id}/annotations")
+async def delete_annotations(study_id: str):
+    if study_id not in STUDIES:
+        raise HTTPException(status_code=404, detail="Study not found.")
+    STUDIES[study_id]["annotations"] = []
+    STUDIES[study_id]["version"] += 1
+    return {"status": "success", "version": STUDIES[study_id]["version"]}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/studies/{id}/status
+# ---------------------------------------------------------------------------
+@app.post("/api/v1/studies/{study_id}/status")
+async def update_status(study_id: str, req: StatusRequest):
+    if study_id not in STUDIES:
+        raise HTTPException(status_code=404, detail="Study not found.")
+    STUDIES[study_id]["status"] = req.status
+    STUDIES[study_id]["version"] += 1
+    return {"status": "success", "new_status": req.status, "version": STUDIES[study_id]["version"]}
+
