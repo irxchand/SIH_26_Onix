@@ -86,6 +86,8 @@ class PredictionResponse(BaseModel):
     simulator: str = "AerSimulator"
     execution_stage: str = "CACHED_BENCHMARK"
     evidence: List[EvidenceItem] = []
+    image_width: Optional[int] = None
+    image_height: Optional[int] = None
 
 class MeasurementPointRequest(BaseModel):
     x: int

@@ -19,22 +19,22 @@ class DenseNetFeatureExtractor:
                                  std=[0.229, 0.224, 0.225])
         ])
         
-    def extract(self, image_path: str) -> torch.Tensor:
+    def extract(self, image_path: str):
         """
         Extracts features from an image using DenseNet121.
-        Returns a 1D tensor of features (after global average pooling).
+        Returns a tuple: (pooled_features_1d, spatial_features_3d)
         """
         image = Image.open(image_path).convert('RGB')
         input_tensor = self.transform(image).unsqueeze(0)  # Add batch dimension
         
         with torch.no_grad():
-            out = self.features(input_tensor)
+            spatial_out = self.features(input_tensor) # Shape: (1, 1024, 7, 7)
             # Global Average Pooling
             import torch.nn.functional as F
-            out = F.adaptive_avg_pool2d(out, (1, 1))
-            out = torch.flatten(out, 1)
+            pooled_out = F.adaptive_avg_pool2d(spatial_out, (1, 1))
+            pooled_out = torch.flatten(pooled_out, 1)
             
-        return out.squeeze(0)
+        return pooled_out.squeeze(0), spatial_out.squeeze(0)
 
 # Singleton for easy import and usage in FastAPI
 extractor = DenseNetFeatureExtractor()

@@ -3,11 +3,12 @@ import os
 import pickle
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
+from sklearn.calibration import CalibratedClassifierCV
 import torch
 
 from src.ml import constants
 
-from qiskit.circuit.library import ZZFeatureMap
+from qiskit.circuit.library import zz_feature_map
 from qiskit_machine_learning.kernels import FidelityQuantumKernel
 from qiskit_algorithms.state_fidelities import ComputeUncompute
 from qiskit.primitives import StatevectorSampler as Sampler
@@ -19,8 +20,8 @@ def train_pca(embeddings: np.ndarray) -> PCA:
     return pca
 
 def construct_quantum_kernel() -> FidelityQuantumKernel:
-    """Constructs a ZZFeatureMap and a FidelityQuantumKernel."""
-    feature_map = ZZFeatureMap(feature_dimension=constants.PCA_COMPONENTS, reps=2, entanglement='linear')
+    """Constructs a zz_feature_map and a FidelityQuantumKernel."""
+    feature_map = zz_feature_map(feature_dimension=constants.PCA_COMPONENTS, reps=2, entanglement='linear')
     
     # We use a primitive Sampler. In production/qiskit_aer, this can be configured 
     # to use AerSimulator, but the base Sampler is sufficient for mathematical validation.
@@ -29,16 +30,18 @@ def construct_quantum_kernel() -> FidelityQuantumKernel:
     quantum_kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)
     return quantum_kernel
 
-def train_classical_svm(features: np.ndarray, labels: np.ndarray) -> SVC:
+def train_classical_svm(features: np.ndarray, labels: np.ndarray):
     """Trains a pure classical SVC on the PCA features for fair comparison."""
-    # Using probability=True so we can extract confidence scores natively
-    csvm = SVC(kernel="rbf", probability=True)
+    # Use CalibratedClassifierCV instead of SVC(probability=True) to avoid warnings
+    base_svm = SVC(kernel="rbf")
+    csvm = CalibratedClassifierCV(base_svm, ensemble=False)
     csvm.fit(features, labels)
     return csvm
 
-def train_qsvm(kernel_matrix: np.ndarray, labels: np.ndarray) -> SVC:
+def train_qsvm(kernel_matrix: np.ndarray, labels: np.ndarray):
     """Trains a classical SVC using the precomputed quantum kernel matrix."""
-    qsvm = SVC(kernel="precomputed", probability=True)
+    base_svm = SVC(kernel="precomputed")
+    qsvm = CalibratedClassifierCV(base_svm, ensemble=False)
     qsvm.fit(kernel_matrix, labels)
     return qsvm
 
@@ -57,9 +60,23 @@ if __name__ == "__main__":
     # Cap samples to 20 to prevent paging file / OOM issues during testing
     N = 20
     
-    print(f"Generating {N} dummy DenseNet embeddings...")
-    dummy_embeddings = np.random.rand(N, constants.DENSENET_FEATURES)
-    dummy_labels = np.random.randint(0, 2, size=N)
+    print(f"Generating {N} dummy DenseNet embeddings (separated clusters for realistic decision boundary)...")
+    
+    # Generate 10 healthy and 10 anomaly samples
+    n_healthy = N // 2
+    n_anomaly = N - n_healthy
+    
+    healthy_embeddings = np.random.normal(loc=0.2, scale=0.1, size=(n_healthy, constants.DENSENET_FEATURES))
+    anomaly_embeddings = np.random.normal(loc=0.8, scale=0.1, size=(n_anomaly, constants.DENSENET_FEATURES))
+    
+    dummy_embeddings = np.vstack([healthy_embeddings, anomaly_embeddings])
+    dummy_labels = np.array([0] * n_healthy + [1] * n_anomaly)
+    
+    # Shuffle the dataset
+    indices = np.arange(N)
+    np.random.shuffle(indices)
+    dummy_embeddings = dummy_embeddings[indices]
+    dummy_labels = dummy_labels[indices]
     
     print(f"1. Training PCA from {constants.DENSENET_FEATURES} -> {constants.PCA_COMPONENTS} dimensions...")
     pca = train_pca(dummy_embeddings)

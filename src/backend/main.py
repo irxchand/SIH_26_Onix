@@ -376,11 +376,27 @@ import asyncio
 
 def run_ml_pipeline(app, image_path: str):
     """Synchronous function to run PyTorch + QSVM pipeline."""
+    from PIL import Image
+    with Image.open(image_path) as img:
+        img_width, img_height = img.size
+        
     # 1. Feature Extraction (DenseNet121)
-    features = app.state.feature_extractor.extract(image_path).numpy()
+    # spatial_features is shape (1024, 7, 7)
+    features, spatial_features = app.state.feature_extractor.extract(image_path)
+    features_np = features.numpy()
+    
+    # Generate Saliency Map / Grad-CAM Simulation from spatial features
+    # Mean across the 1024 channels gives a (7, 7) heatmap
+    heatmap = spatial_features.mean(dim=0).numpy()
+    # Find argmax of the 7x7 grid
+    max_idx = np.unravel_index(np.argmax(heatmap, axis=None), heatmap.shape)
+    # Map the 7x7 grid index (0-6) to a percentage (0-100)
+    # Add a slight offset to center it in the grid cell
+    xPercent = float((max_idx[1] + 0.5) / 7.0 * 100.0)
+    yPercent = float((max_idx[0] + 0.5) / 7.0 * 100.0)
     
     # 2. PCA Compression
-    pca_features = app.state.pca.transform(features.reshape(1, -1))
+    pca_features = app.state.pca.transform(features_np.reshape(1, -1))
     
     # 3. CSVM (Classical SVM) Inference for comparison
     csvm_probs = app.state.csvm.predict_proba(pca_features)[0]
@@ -389,6 +405,10 @@ def run_ml_pipeline(app, image_path: str):
     
     # 4. QSVM Inference
     qkernel = construct_quantum_kernel()
+    
+    # Extract actual quantum circuit metrics
+    actual_qubits = qkernel.feature_map.num_qubits
+    actual_circuit_depth = qkernel.feature_map.depth()
     
     # Evaluate the quantum kernel between the new sample and the training set
     # shape: (1, N_train)
@@ -403,7 +423,13 @@ def run_ml_pipeline(app, image_path: str):
     return {
         "prediction": prediction_label,
         "classical_conf": classical_conf,
-        "quantum_conf": quantum_conf
+        "quantum_conf": quantum_conf,
+        "qubits": actual_qubits,
+        "circuit_depth": actual_circuit_depth,
+        "xPercent": xPercent,
+        "yPercent": yPercent,
+        "image_width": img_width,
+        "image_height": img_height
     }
 
 @app.get("/api/v1/studies/{study_id}/predict", response_model=PredictionResponse)
@@ -437,8 +463,8 @@ async def predict_study_get(study_id: str):
         prediction=res["prediction"],
         inference_time_seconds=inference_time,
         is_mock=False,
-        qubits=8,
-        circuit_depth=16,
+        qubits=res.get("qubits", 8),
+        circuit_depth=res.get("circuit_depth", 16),
         runtime=inference_time,
         feature_map="ZZFeatureMap",
         simulator="AerSimulator",
@@ -449,10 +475,12 @@ async def predict_study_get(study_id: str):
                 region="RIGHT LOWER LOBE" if "Anomaly" in res["prediction"] else "NO SIGNIFICANT FINDINGS",
                 confidence=res["quantum_conf"],
                 signal=f"{res['prediction']} pattern detected",
-                xPercent=np.random.randint(20, 80),
-                yPercent=np.random.randint(20, 80),
+                xPercent=res["xPercent"],
+                yPercent=res["yPercent"],
             )
-        ]
+        ],
+        image_width=res.get("image_width"),
+        image_height=res.get("image_height")
     )
 
 @app.post("/predict", response_model=PredictionResponse)
@@ -481,8 +509,8 @@ async def predict_image(file: UploadFile = File(...)):
         prediction=res["prediction"],
         inference_time_seconds=inference_time,
         is_mock=False,
-        qubits=8,
-        circuit_depth=16,
+        qubits=res.get("qubits", 8),
+        circuit_depth=res.get("circuit_depth", 16),
         runtime=inference_time,
         feature_map="ZZFeatureMap",
         simulator="AerSimulator",
@@ -493,10 +521,12 @@ async def predict_image(file: UploadFile = File(...)):
                 region="RIGHT LOWER LOBE",
                 confidence=res["quantum_conf"],
                 signal=f"{res['prediction']} pattern detected",
-                xPercent=38,
-                yPercent=68,
+                xPercent=res["xPercent"],
+                yPercent=res["yPercent"],
             )
-        ]
+        ],
+        image_width=res.get("image_width"),
+        image_height=res.get("image_height")
     )
 
 # ---------------------------------------------------------------------------
