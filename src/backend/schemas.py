@@ -86,3 +86,36 @@ class PredictionResponse(BaseModel):
     simulator: str = "AerSimulator"
     execution_stage: str = "CACHED_BENCHMARK"
     evidence: List[EvidenceItem] = []
+
+
+class Point(BaseModel):
+    x: float
+    y: float
+
+class CalibrateRequest(BaseModel):
+    brightness: int
+    contrast: int
+    sharpness: int
+
+class MeasurementRequest(BaseModel):
+    type: str
+    points: List[Point]
+
+    @classmethod
+    def validate_ctr(cls, values):
+        if values.get('type') == 'CTR' and len(values.get('points', [])) < 6:
+            raise ValueError("CTR measurement requires at least 6 points")
+        return values
+
+class EvidenceRequest(BaseModel):
+    region: str
+    signal: str
+    xPercent: float
+    yPercent: float
+
+class AnnotationRequest(BaseModel):
+    path: str
+    color: str
+
+class StatusRequest(BaseModel):
+    status: StudyStatus
