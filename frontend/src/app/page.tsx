@@ -1,13 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import LeftToolRail from "@/components/LeftToolRail";
 import XrayCanvas from "@/components/XrayCanvas";
 import RightIntelligence from "@/components/RightIntelligence";
 import QuantumCircuitView from "@/components/QuantumCircuitView";
 import RadiologyQueue from "@/components/RadiologyQueue";
 import { Study, ToolMode, PredictionResults, EvidenceItem, ChecklistStep } from "../types/workstation";
-import { mockStudies, mockPredictions, mockEvidence } from "../mock/studies";
+import { mockPredictions, mockEvidence } from "../mock/studies";
+
+const API_BASE = "http://localhost:8000";
 
 const PIPELINE_STAGES = [
   "IMAGE INGESTION",
@@ -42,7 +44,28 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"QUEUE" | "WORKSPACE">("QUEUE");
 
   // Custom study uploads
-  const [studies, setStudies] = useState<Study[]>(mockStudies);
+  const [studies, setStudies] = useState<Study[]>([]);
+  const [queueLoading, setQueueLoading] = useState(true);
+
+  // Fetch studies from backend on mount
+  const fetchQueue = useCallback(async () => {
+    setQueueLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/queue`);
+      if (!res.ok) throw new Error(`Queue fetch failed: ${res.status}`);
+      const data = await res.json();
+      setStudies(data.studies);
+    } catch (err) {
+      console.error("Failed to fetch queue:", err);
+      // Fallback: leave studies empty, user sees empty state
+    } finally {
+      setQueueLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchQueue();
+  }, [fetchQueue]);
 
   // Checklist state
   const [checklist, setChecklist] = useState<ChecklistStep[]>([
@@ -112,22 +135,35 @@ export default function Home() {
     }
   }, [loading, activeStageIdx, selectedStudy]);
 
-  const handleCustomUpload = (file: File) => {
-    const customId = `XR-TEMP-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newStudy: Study = {
-      id: customId,
-      patientId: `PT-${Math.floor(1000 + Math.random() * 9000)}`,
-      patientName: file.name.substring(0, 15) || "Custom Import",
-      age: 45,
-      sex: "M",
-      modality: "IMPORTED CXR",
-      acquisitionDate: new Date().toLocaleTimeString(),
-      status: "READY",
-      imageUrl: URL.createObjectURL(file),
-    };
+  const handleCustomUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
 
-    setStudies([newStudy, ...studies]);
-    handleSelectStudy(newStudy);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ detail: "Upload failed" }));
+        setError(errData.detail || "Upload failed");
+        return;
+      }
+
+      // Refresh the queue to include the new study
+      await fetchQueue();
+
+      // Select the newly uploaded study
+      const uploadData = await res.json().catch(() => null);
+      if (uploadData?.studyId) {
+        const newStudy = studies.find(s => s.id === uploadData.studyId);
+        if (newStudy) handleSelectStudy(newStudy);
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      setError("Failed to upload image. Is the backend running?");
+    }
   };
 
   const handleResetWorkspace = () => {

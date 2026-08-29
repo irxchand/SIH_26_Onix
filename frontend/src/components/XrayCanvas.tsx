@@ -38,6 +38,7 @@ export default function XrayCanvas({
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [measurementNote, setMeasurementNote] = useState("");
   const [savedMeasurementIssue, setSavedMeasurementIssue] = useState(false);
+  const [segmentationPaths, setSegmentationPaths] = useState<{leftLung: string, rightLung: string} | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -45,7 +46,21 @@ export default function XrayCanvas({
     // Reset state on study change
     setMeasurementNote("");
     setSavedMeasurementIssue(false);
-  }, [study, activeMode]);
+    setSegmentationPaths(null);
+  }, [study]);
+
+  useEffect(() => {
+    if (activeMode === "SEGMENT" && study && !segmentationPaths) {
+      fetch(`http://localhost:8000/api/v1/studies/${study.id}/segmentation`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && data.leftLung && data.rightLung) {
+            setSegmentationPaths({ leftLung: data.leftLung, rightLung: data.rightLung });
+          }
+        })
+        .catch(err => console.error("Failed to fetch segmentation:", err));
+    }
+  }, [activeMode, study, segmentationPaths]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (activeMode !== "MEASURE" || !containerRef.current) return;
@@ -138,11 +153,11 @@ export default function XrayCanvas({
             {/* SVG Interactive Drawing Plane */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
               {/* U-NET SEGMENTATION OVERLAY */}
-              {activeMode === "SEGMENT" && (
+              {activeMode === "SEGMENT" && segmentationPaths && (
                 <>
                   {/* Left Lung overlay */}
                   <path
-                    d="M 25 30 C 20 20, 10 30, 8 50 C 6 70, 12 85, 20 90 C 28 85, 30 50, 25 30 Z"
+                    d={segmentationPaths.leftLung}
                     fill="rgba(59, 130, 246, 0.15)"
                     stroke="#3B82F6"
                     strokeWidth="1.5"
@@ -151,7 +166,7 @@ export default function XrayCanvas({
                   />
                   {/* Right Lung overlay */}
                   <path
-                    d="M 45 30 C 40 20, 30 30, 28 50 C 26 70, 32 85, 40 90 C 48 85, 50 50, 45 30 Z"
+                    d={segmentationPaths.rightLung}
                     fill="rgba(59, 130, 246, 0.15)"
                     stroke="#3B82F6"
                     strokeWidth="1.5"

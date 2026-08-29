@@ -1,9 +1,77 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
+from enum import Enum
+
 
 class HealthResponse(BaseModel):
     status: str
     message: str
+
+
+class StudyStatus(str, Enum):
+    READY = "READY"
+    ANALYZING = "ANALYZING"
+    COMPLETE = "COMPLETE"
+    REVIEW = "REVIEW"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+
+
+class StudyResponse(BaseModel):
+    id: str
+    patientId: str
+    patientName: str
+    age: int
+    sex: str
+    modality: str
+    acquisitionDate: str
+    status: StudyStatus
+    imageUrl: str
+    examDesc: Optional[str] = None
+    issuesCount: Optional[int] = 0
+    birads: Optional[str] = None
+    referringPhysician: Optional[str] = None
+    history: Optional[str] = None
+    comments: Optional[str] = None
+    attending: Optional[str] = None
+
+
+class QueueResponse(BaseModel):
+    studies: List[StudyResponse]
+    total: int
+    page: int
+
+
+class UploadResponse(BaseModel):
+    studyId: str
+    status: StudyStatus
+    imageUrl: str
+
+
+class MetadataResponse(BaseModel):
+    studyId: str
+    pixelSpacingMm: float
+    width: int
+    height: int
+    modality: str
+    dicomTags: dict
+
+
+class SegmentationResponse(BaseModel):
+    studyId: str
+    leftLung: Optional[str] = None
+    rightLung: Optional[str] = None
+    confidence: float
+
+
+class EvidenceItem(BaseModel):
+    id: str
+    region: str
+    confidence: float
+    signal: str
+    xPercent: float
+    yPercent: float
+
 
 class PredictionResponse(BaseModel):
     classical_svm_confidence: float
@@ -11,3 +79,9 @@ class PredictionResponse(BaseModel):
     prediction: str
     inference_time_seconds: float
     is_mock: bool = False
+    qubits: int = 8
+    circuit_depth: int = 24
+    feature_map: str = "ZZFeatureMap"
+    simulator: str = "AerSimulator"
+    execution_stage: str = "CACHED_BENCHMARK"
+    evidence: List[EvidenceItem] = []
