@@ -25,3 +25,5 @@ venv.bak/
 htmlcov/
 .coverage
 .tox/
+
+__pycache__/

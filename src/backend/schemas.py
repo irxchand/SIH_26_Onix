@@ -78,9 +78,10 @@ class PredictionResponse(BaseModel):
     quantum_svm_confidence: float
     prediction: str
     inference_time_seconds: float
-    is_mock: bool = False
     qubits: int = 8
     circuit_depth: int = 24
+    runtime: float
+    is_mock: bool = False
     feature_map: str = "ZZFeatureMap"
     simulator: str = "AerSimulator"
     execution_stage: str = "CACHED_BENCHMARK"

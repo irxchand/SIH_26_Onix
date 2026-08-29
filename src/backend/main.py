@@ -347,7 +347,8 @@ async def predict_image(file: UploadFile = File(...)):
         inference_time_seconds=inference_time,
         is_mock=True,
         qubits=8,
-        circuit_depth=24,
+        circuit_depth=16,
+        runtime=inference_time,
         feature_map="ZZFeatureMap",
         simulator="AerSimulator",
         execution_stage="CACHED_BENCHMARK",
@@ -360,5 +361,5 @@ async def predict_image(file: UploadFile = File(...)):
                 xPercent=38,
                 yPercent=68,
             )
-        ],
+        ]
     )
