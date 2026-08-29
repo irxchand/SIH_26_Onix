@@ -19,7 +19,6 @@ interface XrayCanvasProps {
   onToggleFullscreen: () => void;
   checklist: ChecklistStep[];
   onChecklistUpdate: (updatedChecklist: ChecklistStep[]) => void;
-  imageWidth?: number;
   imageHeight?: number;
 }
 
@@ -39,7 +38,6 @@ export default function XrayCanvas({
   onToggleFullscreen,
   checklist,
   onChecklistUpdate,
-  imageWidth,
   imageHeight,
 }: XrayCanvasProps) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
