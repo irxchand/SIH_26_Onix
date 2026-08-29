@@ -119,19 +119,36 @@ export default function Home() {
       }, duration);
       return () => clearTimeout(timer);
     } else {
-      // Pipeline complete: Load mock or fetch results
-      setLoading(false);
-      setActiveStageIdx(-1);
-      if (selectedStudy) {
-        setResults(mockPredictions[selectedStudy.id] || {
-          classical_svm_confidence: 0.87,
-          quantum_svm_confidence: 0.92,
-          prediction: "Anomaly Detected",
-          inference_time_seconds: 0.485,
-          is_mock: true
-        });
-        setEvidence(mockEvidence[selectedStudy.id] || []);
-      }
+      // Pipeline complete: Fetch live results from backend
+      const fetchResults = async () => {
+        if (!selectedStudy) return;
+        try {
+          const res = await fetch(`${API_BASE}/api/v1/studies/${selectedStudy.id}/predict`);
+          if (!res.ok) throw new Error("Prediction failed");
+          const data = await res.json();
+          setResults(data);
+          setEvidence(data.evidence || []);
+        } catch (err) {
+          console.error(err);
+          // Fallback if backend is down
+          setResults(mockPredictions[selectedStudy.id] || {
+            classical_svm_confidence: 0.87,
+            quantum_svm_confidence: 0.92,
+            prediction: "Anomaly Detected",
+            inference_time_seconds: 0.485,
+            is_mock: true,
+            qubits: 8,
+            circuit_depth: 24,
+            runtime: 0.485
+          });
+          setEvidence(mockEvidence[selectedStudy.id] || []);
+        } finally {
+          setLoading(false);
+          setActiveStageIdx(-1);
+        }
+      };
+      
+      fetchResults();
     }
   }, [loading, activeStageIdx, selectedStudy]);
 

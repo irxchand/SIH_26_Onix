@@ -75,4 +75,7 @@ export interface PredictionResults {
   prediction: string;
   inference_time_seconds: number;
   is_mock: boolean;
+  qubits?: number;
+  circuit_depth?: number;
+  runtime?: number;
 }

@@ -202,11 +202,11 @@ export default function RightIntelligence({ study, results, loading, checklist, 
             </div>
             <div className="flex justify-between py-1">
               <span>QUBITS / PCA DIMS:</span>
-              <span className="text-gray-300">8</span>
+              <span className="text-gray-300">{results.qubits || 8}</span>
             </div>
             <div className="flex justify-between py-1">
               <span>CIRCUIT DEPTH:</span>
-              <span className="text-gray-300">24</span>
+              <span className="text-gray-300">{results.circuit_depth || 24}</span>
             </div>
             <div className="flex justify-between py-1">
               <span>EXECUTION STAGE:</span>

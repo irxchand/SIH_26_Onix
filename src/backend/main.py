@@ -335,6 +335,39 @@ async def get_segmentation(study_id: str):
 # ---------------------------------------------------------------------------
 # POST /predict — (existing, expanded with full payload)
 # ---------------------------------------------------------------------------
+@app.get("/api/v1/studies/{study_id}/predict", response_model=PredictionResponse)
+async def predict_study_get(study_id: str):
+    if study_id not in STUDIES:
+        raise HTTPException(status_code=404, detail=f"Study {study_id} not found.")
+        
+    start_time = time.time()
+    time.sleep(0.3)  # Simulate processing
+    inference_time = time.time() - start_time
+
+    return PredictionResponse(
+        classical_svm_confidence=0.87,
+        quantum_svm_confidence=0.92,
+        prediction="Anomaly Detected" if "anomaly" in STUDIES[study_id].get("imageUrl", "") else "Healthy",
+        inference_time_seconds=inference_time,
+        is_mock=True,
+        qubits=8,
+        circuit_depth=16,
+        runtime=inference_time,
+        feature_map="ZZFeatureMap",
+        simulator="AerSimulator",
+        execution_stage="CACHED_BENCHMARK",
+        evidence=[
+            EvidenceItem(
+                id="E-01",
+                region="RIGHT LOWER LUNG LOBE",
+                confidence=0.87,
+                signal="Abnormal density/feature pattern detected in right lower zone",
+                xPercent=38,
+                yPercent=68,
+            )
+        ]
+    )
+
 @app.post("/predict", response_model=PredictionResponse)
 @app.post("/api/v1/predict", response_model=PredictionResponse)
 async def predict_image(file: UploadFile = File(...)):

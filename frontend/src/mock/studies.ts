@@ -77,32 +77,44 @@ export const mockStudies: Study[] = [
 
 export const mockPredictions: Record<string, PredictionResults> = {
   "XR-2026-00421": {
-    classical_svm_confidence: 0.12,
-    quantum_svm_confidence: 0.08,
+    classical_svm_confidence: 0.82,
+    quantum_svm_confidence: 0.89,
     prediction: "Healthy",
-    inference_time_seconds: 0.380,
-    is_mock: true,
-  },
-  "XR-2026-00512": {
-    classical_svm_confidence: 0.87,
-    quantum_svm_confidence: 0.92,
-    prediction: "Anomaly Detected",
     inference_time_seconds: 0.485,
     is_mock: true,
+    qubits: 8,
+    circuit_depth: 24,
+    runtime: 0.485
+  },
+  "XR-2026-00512": {
+    classical_svm_confidence: 0.94,
+    quantum_svm_confidence: 0.97,
+    prediction: "Anomaly Detected",
+    inference_time_seconds: 0.512,
+    is_mock: true,
+    qubits: 8,
+    circuit_depth: 24,
+    runtime: 0.512
   },
   "XR-2026-00513": {
-    classical_svm_confidence: 0.74,
-    quantum_svm_confidence: 0.79,
+    classical_svm_confidence: 0.78,
+    quantum_svm_confidence: 0.85,
     prediction: "Anomaly Detected",
-    inference_time_seconds: 0.521,
+    inference_time_seconds: 0.420,
     is_mock: true,
+    qubits: 8,
+    circuit_depth: 24,
+    runtime: 0.420
   },
   "XR-2026-00514": {
-    classical_svm_confidence: 0.09,
-    quantum_svm_confidence: 0.05,
+    classical_svm_confidence: 0.96,
+    quantum_svm_confidence: 0.98,
     prediction: "Healthy",
-    inference_time_seconds: 0.315,
+    inference_time_seconds: 0.455,
     is_mock: true,
+    qubits: 8,
+    circuit_depth: 24,
+    runtime: 0.455
   }
 };
 
