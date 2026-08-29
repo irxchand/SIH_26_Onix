@@ -331,7 +331,6 @@ export default function Home() {
                 checklist={checklist}
                 onChecklistUpdate={handleChecklistUpdate}
                 imageWidth={imageWidth}
-                imageHeight={imageHeight}
               />
 
               {/* Patient Record Card */}
