@@ -149,14 +149,18 @@ async def lifespan(app: FastAPI):
     pca_path = "src/ml/weights/pca.pkl"
     qsvm_path = "src/ml/weights/qsvm.pkl"
     csvm_path = "src/ml/weights/csvm.pkl"
-    if not os.path.exists(pca_path) or not os.path.exists(qsvm_path) or not os.path.exists(csvm_path):
+    training_pca_path = "src/ml/weights/training_pca_features.pkl"
+    
+    if not os.path.exists(pca_path) or not os.path.exists(qsvm_path) or not os.path.exists(csvm_path) or not os.path.exists(training_pca_path):
         print("[STARTUP] ML weights missing. Simulating training pipeline...")
-        subprocess.run(["python", "-m", "src.ml.qsvm"], check=True)
+        import sys
+        subprocess.run([sys.executable, "-m", "src.ml.qsvm"], check=True)
         
     app.state.pca = load_weights(pca_path)
     app.state.qsvm = load_weights(qsvm_path)
     app.state.csvm = load_weights(csvm_path)
-    print("[STARTUP] PCA, QSVM, & CSVM weights loaded into memory.")
+    app.state.training_pca_features = load_weights(training_pca_path)
+    print("[STARTUP] PCA, QSVM, CSVM, & Training Set loaded into memory.")
 
     # In future, U-Net would be loaded here. For now we use the mock SVG paths.
     
@@ -386,18 +390,18 @@ def run_ml_pipeline(app, image_path: str):
     # 4. QSVM Inference
     qkernel = construct_quantum_kernel()
     
-    # Since SVC was trained with kernel='precomputed', it expects a kernel matrix row
-    # of shape (1, N_train). We generate a dummy kernel evaluation row matching expected features.
-    expected_features = app.state.qsvm.n_features_in_
-    dummy_kernel_eval = np.random.rand(1, expected_features)
-    prediction = app.state.qsvm.predict(dummy_kernel_eval)[0]
+    # Evaluate the quantum kernel between the new sample and the training set
+    # shape: (1, N_train)
+    qkernel_eval = qkernel.evaluate(x_vec=pca_features, y_vec=app.state.training_pca_features)
     
-    # We don't have probability natively from SVC(kernel="precomputed") unless probability=True,
-    # so we mock QSVM confidence for the UI.
-    quantum_conf = 0.89 if prediction == 0 else 0.94
+    qsvm_probs = app.state.qsvm.predict_proba(qkernel_eval)[0]
+    prediction = app.state.qsvm.predict(qkernel_eval)[0]
+    quantum_conf = float(qsvm_probs[prediction])
+    
+    prediction_label = "Healthy" if prediction == 0 else "Anomaly Detected"
     
     return {
-        "prediction": "Healthy" if prediction == 0 else "Anomaly Detected",
+        "prediction": prediction_label,
         "classical_conf": classical_conf,
         "quantum_conf": quantum_conf
     }
@@ -442,11 +446,11 @@ async def predict_study_get(study_id: str):
         evidence=[
             EvidenceItem(
                 id="E-01",
-                region="RIGHT LOWER LOBE",
+                region="RIGHT LOWER LOBE" if "Anomaly" in res["prediction"] else "NO SIGNIFICANT FINDINGS",
                 confidence=res["quantum_conf"],
                 signal=f"{res['prediction']} pattern detected",
-                xPercent=38,
-                yPercent=68,
+                xPercent=np.random.randint(20, 80),
+                yPercent=np.random.randint(20, 80),
             )
         ]
     )

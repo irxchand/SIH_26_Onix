@@ -38,7 +38,7 @@ def train_classical_svm(features: np.ndarray, labels: np.ndarray) -> SVC:
 
 def train_qsvm(kernel_matrix: np.ndarray, labels: np.ndarray) -> SVC:
     """Trains a classical SVC using the precomputed quantum kernel matrix."""
-    qsvm = SVC(kernel="precomputed")
+    qsvm = SVC(kernel="precomputed", probability=True)
     qsvm.fit(kernel_matrix, labels)
     return qsvm
 
@@ -81,5 +81,7 @@ if __name__ == "__main__":
     save_weights(pca, "src/ml/weights/pca.pkl")
     save_weights(qsvm, "src/ml/weights/qsvm.pkl")
     save_weights(csvm, "src/ml/weights/csvm.pkl")
+    # Save the training PCA features so we can evaluate new samples against them in production
+    save_weights(pca_features, "src/ml/weights/training_pca_features.pkl")
     
     print("Training complete.")
