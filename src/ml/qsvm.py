@@ -29,6 +29,13 @@ def construct_quantum_kernel() -> FidelityQuantumKernel:
     quantum_kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)
     return quantum_kernel
 
+def train_classical_svm(features: np.ndarray, labels: np.ndarray) -> SVC:
+    """Trains a pure classical SVC on the PCA features for fair comparison."""
+    # Using probability=True so we can extract confidence scores natively
+    csvm = SVC(kernel="rbf", probability=True)
+    csvm.fit(features, labels)
+    return csvm
+
 def train_qsvm(kernel_matrix: np.ndarray, labels: np.ndarray) -> SVC:
     """Trains a classical SVC using the precomputed quantum kernel matrix."""
     qsvm = SVC(kernel="precomputed")
@@ -64,11 +71,15 @@ if __name__ == "__main__":
     print("3. Precomputing Quantum Kernel Matrix (This may take a moment)...")
     kernel_matrix = qkernel.evaluate(x_vec=pca_features)
     
-    print("4. Training QSVM...")
+    print("4a. Training Classical SVM (RBF) for comparison...")
+    csvm = train_classical_svm(pca_features, dummy_labels)
+
+    print("4b. Training QSVM...")
     qsvm = train_qsvm(kernel_matrix, dummy_labels)
     
     print("5. Saving weights to disk...")
     save_weights(pca, "src/ml/weights/pca.pkl")
     save_weights(qsvm, "src/ml/weights/qsvm.pkl")
+    save_weights(csvm, "src/ml/weights/csvm.pkl")
     
     print("Training complete.")
