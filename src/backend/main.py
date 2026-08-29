@@ -44,7 +44,7 @@ _SEED_STUDIES = [
         "modality": "CHEST X-RAY (PA)",
         "acquisitionDate": "29 AUG 2026 04:12",
         "status": StudyStatus.READY,
-        "imageUrl": "/uploads/mock_xray_normal.jpg",
+        "imageUrl": "http://localhost:8000/uploads/mock_xray_normal.jpg",
         "examDesc": "Chest X-ray",
         "issuesCount": 2,
         "birads": "2",
@@ -62,7 +62,7 @@ _SEED_STUDIES = [
         "modality": "CHEST X-RAY (PA)",
         "acquisitionDate": "29 AUG 2026 03:30",
         "status": StudyStatus.COMPLETE,
-        "imageUrl": "/uploads/mock_xray_anomaly.jpg",
+        "imageUrl": "http://localhost:8000/uploads/mock_xray_anomaly.jpg",
         "examDesc": "Abdominal X-ray",
         "issuesCount": 0,
         "birads": "1",
@@ -80,7 +80,7 @@ _SEED_STUDIES = [
         "modality": "CHEST X-RAY (AP)",
         "acquisitionDate": "29 AUG 2026 02:15",
         "status": StudyStatus.REVIEW,
-        "imageUrl": "/uploads/mock_xray_anomaly2.jpg",
+        "imageUrl": "http://localhost:8000/uploads/mock_xray_anomaly2.jpg",
         "examDesc": "Venography",
         "issuesCount": 1,
         "birads": "3",
@@ -98,7 +98,7 @@ _SEED_STUDIES = [
         "modality": "CHEST X-RAY (PA)",
         "acquisitionDate": "28 AUG 2026 19:40",
         "status": StudyStatus.READY,
-        "imageUrl": "/uploads/mock_xray_normal2.jpg",
+        "imageUrl": "http://localhost:8000/uploads/mock_xray_normal2.jpg",
         "examDesc": "Chest X-ray",
         "issuesCount": 0,
         "birads": "1",
@@ -125,7 +125,12 @@ async def lifespan(app: FastAPI):
     print(f"[STARTUP] Seeded {len(STUDIES)} studies into in-memory store.")
     print(f"[STARTUP] Upload directory: {UPLOADS_DIR.resolve()}")
 
-    # TODO Phase 3: Load PyTorch U-Net, DenseNet121, and Qiskit models here
+    # Load pre-trained DenseNet121 model
+    from src.ml.feature_extraction import DenseNetFeatureExtractor
+    app.state.feature_extractor = DenseNetFeatureExtractor()
+    print("[STARTUP] Pre-trained DenseNet121 weights loaded into memory.")
+
+    # TODO Phase 3: Load PyTorch U-Net and Qiskit models here
     # from src.data.segmentation import UNetSegmenter
     # app.state.segmenter = UNetSegmenter()
 
@@ -248,7 +253,7 @@ async def upload_image(file: UploadFile = File(...)):
         "modality": "IMPORTED CXR",
         "acquisitionDate": time.strftime("%d %b %Y %H:%M").upper(),
         "status": StudyStatus.READY,
-        "imageUrl": f"/uploads/{filename}",
+        "imageUrl": f"http://localhost:8000/uploads/{filename}",
         "examDesc": "Imported X-ray",
         "issuesCount": 0,
         "birads": None,
