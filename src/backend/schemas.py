@@ -86,3 +86,39 @@ class PredictionResponse(BaseModel):
     simulator: str = "AerSimulator"
     execution_stage: str = "CACHED_BENCHMARK"
     evidence: List[EvidenceItem] = []
+
+# --- Phase 3 Interactive Endpoint Schemas ---
+
+class CalibrateRequest(BaseModel):
+    brightness: int
+    contrast: int
+    sharpness: int
+
+class MeasurementPointRequest(BaseModel):
+    x: int
+    y: int
+    
+class ChecklistItemRequest(BaseModel):
+    id: str
+    label: str
+    status: str
+    point: Optional[MeasurementPointRequest] = None
+
+class MeasurementRequest(BaseModel):
+    points: List[ChecklistItemRequest]
+    hDistMm: float
+    cDistMm: float
+    ratio: float
+    note: Optional[str] = None
+
+class EvidenceNotesRequest(BaseModel):
+    note: str
+    xPercent: float
+    yPercent: float
+
+class AnnotationRequest(BaseModel):
+    paths: List[str]
+
+class StatusRequest(BaseModel):
+    status: StudyStatus
+

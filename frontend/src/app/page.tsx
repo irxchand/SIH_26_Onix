@@ -29,6 +29,19 @@ export default function Home() {
   const [contrast, setContrast] = useState(100);
   const [sharpness, setSharpness] = useState(100);
 
+  // Debounce calibration saves
+  useEffect(() => {
+    if (!selectedStudy) return;
+    const timer = setTimeout(() => {
+      fetch(`${API_BASE}/api/v1/studies/${selectedStudy.id}/calibrate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brightness, contrast, sharpness })
+      }).catch(console.error);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [brightness, contrast, sharpness, selectedStudy]);
+
   // Viewport transforms
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -68,6 +81,7 @@ export default function Home() {
   }, [fetchQueue]);
 
   // Checklist state
+  const [pixelSpacingMm, setPixelSpacingMm] = useState<number>(0.143);
   const [checklist, setChecklist] = useState<ChecklistStep[]>([
     { id: "spine_top", label: "Highest point of the spine", status: "pending" },
     { id: "spine_bottom", label: "Lowest point of the spine", status: "pending" },
@@ -81,9 +95,21 @@ export default function Home() {
     setChecklist(updatedChecklist);
   };
 
-  const handleSelectStudy = (study: Study) => {
+  const handleSelectStudy = async (study: Study) => {
     setSelectedStudy(study);
     setViewMode("WORKSPACE");
+    
+    // Fetch pixel spacing metadata
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/studies/${study.id}/metadata`);
+      if (res.ok) {
+        const meta = await res.json();
+        setPixelSpacingMm(meta.pixelSpacingMm || 0.143);
+      }
+    } catch(err) {
+      console.error(err);
+      setPixelSpacingMm(0.143);
+    }
     
     // Reset controls
     setBrightness(100);
@@ -280,6 +306,7 @@ export default function Home() {
               <XrayCanvas
                 study={selectedStudy}
                 activeMode={activeMode}
+                pixelSpacingMm={pixelSpacingMm}
                 brightness={brightness}
                 contrast={contrast}
                 sharpness={sharpness}
@@ -348,8 +375,24 @@ export default function Home() {
                     results={results} 
                     loading={loading} 
                     checklist={checklist}
-                    onAccept={() => alert("Study Accepted")}
-                    onReject={() => alert("Study Rejected")}
+                    onAccept={async () => {
+                      if (!selectedStudy) return;
+                      await fetch(`${API_BASE}/api/v1/studies/${selectedStudy.id}/status`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({status: 'ACCEPTED'})
+                      });
+                      alert("Study Accepted");
+                    }}
+                    onReject={async () => {
+                      if (!selectedStudy) return;
+                      await fetch(`${API_BASE}/api/v1/studies/${selectedStudy.id}/status`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({status: 'REJECTED'})
+                      });
+                      alert("Study Rejected");
+                    }}
                   />
                   
                   {/* Quantum circuit board visualization */}

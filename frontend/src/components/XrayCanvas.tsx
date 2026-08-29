@@ -6,6 +6,7 @@ import { ToolMode, MeasurementPoint, EvidenceItem, Study, ChecklistStep } from "
 interface XrayCanvasProps {
   study: Study | null;
   activeMode: ToolMode;
+  pixelSpacingMm: number;
   brightness: number;
   contrast: number;
   sharpness: number;
@@ -22,6 +23,7 @@ interface XrayCanvasProps {
 export default function XrayCanvas({
   study,
   activeMode,
+  pixelSpacingMm,
   brightness,
   contrast,
   sharpness,
@@ -39,8 +41,21 @@ export default function XrayCanvas({
   const [measurementNote, setMeasurementNote] = useState("");
   const [savedMeasurementIssue, setSavedMeasurementIssue] = useState(false);
   const [segmentationPaths, setSegmentationPaths] = useState<{leftLung: string, rightLung: string} | null>(null);
+  
+  // Annotation states
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentPath, setCurrentPath] = useState<string>("");
+  const [drawnPaths, setDrawnPaths] = useState<string[]>([]);
+  
+  // Evidence dragging states
+  const [localEvidence, setLocalEvidence] = useState<EvidenceItem[]>(evidence);
+  const [draggingPin, setDraggingPin] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setLocalEvidence(evidence);
+  }, [evidence]);
 
   useEffect(() => {
     // Reset state on study change
@@ -62,28 +77,64 @@ export default function XrayCanvas({
     }
   }, [activeMode, study, segmentationPaths]);
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (activeMode !== "MEASURE" || !containerRef.current) return;
-
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
     const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
 
-    // Find first pending checklist item
-    const pendingIdx = checklist.findIndex(item => item.status === "pending");
-    if (pendingIdx !== -1) {
-      const updated = [...checklist];
-      updated[pendingIdx] = { ...updated[pendingIdx], status: "completed", point: { x, y } };
-      onChecklistUpdate(updated);
+    if (activeMode === "MEASURE") {
+      const pendingIdx = checklist.findIndex(item => item.status === "pending");
+      if (pendingIdx !== -1) {
+        const updated = [...checklist];
+        updated[pendingIdx] = { ...updated[pendingIdx], status: "completed", point: { x, y } };
+        onChecklistUpdate(updated);
+      }
+    } else if (activeMode === "ANNOTATE") {
+      setIsDrawing(true);
+      const fx = ((e.clientX - rect.left) / rect.width) * 100;
+      const fy = ((e.clientY - rect.top) / rect.height) * 100;
+      setCurrentPath(`${fx},${fy}`);
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
     const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
     setMousePos({ x, y });
+
+    if (activeMode === "ANNOTATE" && isDrawing) {
+       const fx = ((e.clientX - rect.left) / rect.width) * 100;
+       const fy = ((e.clientY - rect.top) / rect.height) * 100;
+       setCurrentPath(prev => `${prev} ${fx},${fy}`);
+    } else if (activeMode === "EVIDENCE" && draggingPin) {
+       setLocalEvidence(prev => prev.map(pin => pin.id === draggingPin ? { ...pin, xPercent: x, yPercent: y } : pin));
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeMode === "ANNOTATE" && isDrawing) {
+       setIsDrawing(false);
+       if (currentPath) {
+         const updated = [...drawnPaths, currentPath];
+         setDrawnPaths(updated);
+         setCurrentPath("");
+         if (study) {
+            fetch(`http://localhost:8000/api/v1/studies/${study.id}/annotations`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paths: updated })
+            }).then(res => {
+                if (res.status === 409) alert("Conflict: Another user has modified this study.");
+            }).catch(console.error);
+         }
+       }
+    } else if (activeMode === "EVIDENCE" && draggingPin) {
+       setDraggingPin(null);
+    }
   };
 
   const getMeasurementResults = () => {
@@ -97,9 +148,10 @@ export default function XrayCanvas({
     const hDistPx = Math.abs(heartLeft.x - heartRight.x);
     const cDistPx = Math.abs(chestLeft.x - chestRight.x);
 
-    // Simulate mm
-    const hDistMm = Math.round(hDistPx * 4.2);
-    const cDistMm = Math.round(cDistPx * 4.2);
+    // Approximate conversion using pixel spacing
+    const scaleFactor = 30; // Assuming 3000px nominal width, 1% = 30px
+    const hDistMm = Math.round(hDistPx * scaleFactor * pixelSpacingMm);
+    const cDistMm = Math.round(cDistPx * scaleFactor * pixelSpacingMm);
     const ratio = cDistMm > 0 ? (hDistMm / cDistMm) : 0;
     
     return { hDistMm, cDistMm, ratio, isComplete: true };
@@ -127,9 +179,10 @@ export default function XrayCanvas({
       {/* Main Viewport Container */}
       <div
         ref={containerRef}
-        onClick={handleCanvasClick}
-        onMouseMove={handleMouseMove}
-        className="relative border border-gray-800 rounded-lg bg-[#07090e] h-[450px] flex items-center justify-center overflow-hidden cursor-crosshair group"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        className="relative border border-gray-800 rounded-lg bg-[#07090e] h-[450px] flex items-center justify-center overflow-hidden cursor-crosshair group touch-none"
       >
         {/* Reticles & Border markings */}
         <div className="absolute inset-4 border border-gray-900/30 pointer-events-none z-0"></div>
@@ -215,6 +268,18 @@ export default function XrayCanvas({
                   })}
                 </>
               )}
+              
+              {/* FREEHAND ANNOTATIONS */}
+              {activeMode === "ANNOTATE" && (
+                <>
+                  {drawnPaths.map((pathStr, i) => (
+                    <polyline key={i} points={pathStr} fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  ))}
+                  {currentPath && (
+                    <polyline points={currentPath} fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  )}
+                </>
+              )}
             </svg>
 
             {/* INTERACTIVE MEASUREMENT POPOVER */}
@@ -255,7 +320,28 @@ export default function XrayCanvas({
 
                  <button 
                    className="w-full bg-[#40b8c4] hover:bg-[#3496a0] text-black font-bold py-1.5 rounded transition-colors"
-                   onClick={(e) => { e.stopPropagation(); setSavedMeasurementIssue(true); }}
+                   onClick={async (e) => { 
+                     e.stopPropagation(); 
+                     setSavedMeasurementIssue(true); 
+                     if (study) {
+                       try {
+                         const res = await fetch(`http://localhost:8000/api/v1/studies/${study.id}/measurements`, {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify({
+                             points: checklist,
+                             hDistMm: meas.hDistMm,
+                             cDistMm: meas.cDistMm,
+                             ratio: meas.ratio,
+                             note: measurementNote
+                           })
+                         });
+                         if (res.status === 409) alert("Conflict: Another user has modified this study.");
+                       } catch(err) {
+                         console.error(err);
+                       }
+                     }
+                   }}
                  >
                    Save ✓
                  </button>
@@ -264,16 +350,22 @@ export default function XrayCanvas({
 
             {/* FLOATING ANCHORED ISSUES */}
             {activeMode === "EVIDENCE" &&
-              evidence.map((item) => (
+              localEvidence.map((item) => (
                 <div
                   key={item.id}
                   className="absolute z-20"
                   style={{ left: `${item.xPercent}%`, top: `${item.yPercent}%` }}
                 >
                   {/* Pulse Pin */}
-                  <div className="relative flex items-center justify-center">
-                    <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                  <div 
+                    className="relative flex items-center justify-center cursor-move"
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setDraggingPin(item.id);
+                    }}
+                  >
+                    <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-400 opacity-75 pointer-events-none"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 pointer-events-none"></span>
                   </div>
 
                   {/* floating evidence dialog */}
@@ -298,6 +390,18 @@ export default function XrayCanvas({
                         placeholder="Add clinical observation..."
                         value={notes[item.id] || ""}
                         onChange={(e) => setNotes({ ...notes, [item.id]: e.target.value })}
+                        onBlur={async () => {
+                          if (study && notes[item.id]) {
+                            try {
+                              const res = await fetch(`http://localhost:8000/api/v1/studies/${study.id}/evidence`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ note: notes[item.id], xPercent: item.xPercent, yPercent: item.yPercent })
+                              });
+                              if (res.status === 409) alert("Conflict: Another user has modified this study.");
+                            } catch(err) { console.error(err); }
+                          }
+                        }}
                         className="w-full bg-[#07090e] border border-gray-800 rounded px-1.5 py-0.5 text-[8px] text-gray-300 focus:outline-none"
                       />
                     </div>
