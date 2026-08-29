@@ -6,8 +6,8 @@ import XrayCanvas from "@/components/XrayCanvas";
 import RightIntelligence from "@/components/RightIntelligence";
 import QuantumCircuitView from "@/components/QuantumCircuitView";
 import RadiologyQueue from "@/components/RadiologyQueue";
+import UploadWidget from "../components/UploadWidget";
 import { Study, ToolMode, PredictionResults, EvidenceItem, ChecklistStep } from "../types/workstation";
-import { mockPredictions, mockEvidence } from "../mock/studies";
 
 const API_BASE = "http://localhost:8000";
 
@@ -80,8 +80,8 @@ export default function Home() {
     fetchQueue();
   }, [fetchQueue]);
 
-  // Checklist state
   const [pixelSpacingMm, setPixelSpacingMm] = useState<number>(0.143);
+  const [imageWidth, setImageWidth] = useState<number>(2048);
   const [checklist, setChecklist] = useState<ChecklistStep[]>([
     { id: "spine_top", label: "Highest point of the spine", status: "pending" },
     { id: "spine_bottom", label: "Lowest point of the spine", status: "pending" },
@@ -105,10 +105,12 @@ export default function Home() {
       if (res.ok) {
         const meta = await res.json();
         setPixelSpacingMm(meta.pixelSpacingMm || 0.143);
+        setImageWidth(meta.width || 2048);
       }
     } catch(err) {
       console.error(err);
       setPixelSpacingMm(0.143);
+      setImageWidth(2048);
     }
     
     // Reset controls
@@ -134,49 +136,58 @@ export default function Home() {
     setActiveStageIdx(0);
   };
 
-  // Run the progressive pipeline animation steps
+  // Run the progressive pipeline animation steps while awaiting prediction
+  // 1. Progressive visual pipeline ticks
   useEffect(() => {
     if (!loading || activeStageIdx === -1) return;
 
-    if (activeStageIdx < PIPELINE_STAGES.length) {
-      const duration = activeStageIdx === 6 ? 1200 : 400; // Let QSVM step take slightly longer for visual impact
-      const timer = setTimeout(() => {
+    if (activeStageIdx < PIPELINE_STAGES.length - 1) {
+      const stageTimer = setTimeout(() => {
         setActiveStageIdx((prev) => prev + 1);
-      }, duration);
-      return () => clearTimeout(timer);
-    } else {
-      // Pipeline complete: Fetch live results from backend
-      const fetchResults = async () => {
-        if (!selectedStudy) return;
-        try {
-          const res = await fetch(`${API_BASE}/api/v1/studies/${selectedStudy.id}/predict`);
-          if (!res.ok) throw new Error("Prediction failed");
-          const data = await res.json();
+      }, 500); // 500ms per stage for visual effect
+      return () => clearTimeout(stageTimer);
+    }
+  }, [loading, activeStageIdx]);
+
+  // 2. Fetch results on workflow start
+  useEffect(() => {
+    if (!loading || !selectedStudy) return;
+
+    let isMounted = true;
+    const fetchResults = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/studies/${selectedStudy.id}/predict`);
+        if (!res.ok) throw new Error("Prediction failed");
+        const data = await res.json();
+        if (isMounted) {
           setResults(data);
           setEvidence(data.evidence || []);
-        } catch (err) {
-          console.error(err);
-          // Fallback if backend is down
-          setResults(mockPredictions[selectedStudy.id] || {
-            classical_svm_confidence: 0.87,
-            quantum_svm_confidence: 0.92,
-            prediction: "Anomaly Detected",
-            inference_time_seconds: 0.485,
-            is_mock: true,
-            qubits: 8,
-            circuit_depth: 24,
-            runtime: 0.485
-          });
-          setEvidence(mockEvidence[selectedStudy.id] || []);
-        } finally {
+          // Jump to the final stage once data arrives
+          setActiveStageIdx(PIPELINE_STAGES.length);
+          setTimeout(() => {
+            if (isMounted) {
+              setLoading(false);
+              setActiveStageIdx(-1);
+            }
+          }, 500);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) {
+          setError("SYSTEM FAULT: QPU UNAVAILABLE. PIPELINE HALTED.");
           setLoading(false);
           setActiveStageIdx(-1);
         }
-      };
-      
-      fetchResults();
-    }
-  }, [loading, activeStageIdx, selectedStudy]);
+      }
+    };
+
+    // Only initiate the API call once
+    fetchResults();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loading, selectedStudy]);
 
   const handleCustomUpload = async (file: File) => {
     const formData = new FormData();
@@ -307,6 +318,7 @@ export default function Home() {
                 study={selectedStudy}
                 activeMode={activeMode}
                 pixelSpacingMm={pixelSpacingMm}
+                imageWidth={imageWidth}
                 brightness={brightness}
                 contrast={contrast}
                 sharpness={sharpness}
@@ -396,7 +408,14 @@ export default function Home() {
                   />
                   
                   {/* Quantum circuit board visualization */}
-                  <QuantumCircuitView isAnimating={activeStageIdx >= 5 || loading} />
+                  <QuantumCircuitView 
+                    isAnimating={activeStageIdx >= 5 || loading} 
+                    metrics={{
+                      qubits: results?.qubits ?? 8,
+                      circuitDepth: results?.circuit_depth ?? 24,
+                      featureMap: results?.feature_map ?? 'ZZFeatureMap'
+                    }}
+                  />
                 </>
               )}
             </div>

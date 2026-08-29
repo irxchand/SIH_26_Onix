@@ -15,6 +15,8 @@ export interface Study {
   history?: string;
   comments?: string;
   attending?: string;
+  dataset?: string;
+  trueLabel?: string;
 }
 
 export type ToolMode = "SCAN" | "MEASURE" | "ANNOTATE" | "SEGMENT" | "EVIDENCE" | "QUANTUM" | "IMAGE";
@@ -78,4 +80,6 @@ export interface PredictionResults {
   qubits?: number;
   circuit_depth?: number;
   runtime?: number;
+  simulator?: string;
+  feature_map?: string;
 }

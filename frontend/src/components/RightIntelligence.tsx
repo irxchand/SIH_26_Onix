@@ -34,7 +34,9 @@ export default function RightIntelligence({ study, results, loading, checklist, 
 
   const classicalLatency = Math.round(results.inference_time_seconds * 1000 * 0.05);
   const quantumLatency = Math.round(results.inference_time_seconds * 1000);
-  const isAgreement = results.prediction !== "Healthy"; // Simplification for mock outputs
+  // TB detected → both models flagged positive → agreement state
+  // Normal → models resolved to negative → no alert
+  const isAgreement = results.prediction.toLowerCase().includes("tuberculosis");
 
   return (
     <div className="w-full space-y-4 font-mono">
@@ -58,19 +60,18 @@ export default function RightIntelligence({ study, results, loading, checklist, 
         </ul>
       </div>
 
-      {/* PATIENT & ACCEPT/REJECT (From the video UI) */}
+      {/* PATIENT & RECORD DETAILS */}
       {study && (
         <div className="border border-gray-800 rounded-lg p-3 bg-[#0d1117] space-y-3">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="text-xs font-bold text-white">{study.patientName} / ID: {study.patientId}</h3>
+              <h3 className="text-xs font-bold text-white">STUDY: {study.id}</h3>
               <div className="text-[9px] text-gray-500 mt-1 flex space-x-3">
-                <span>Sex: {study.sex === "M" ? "Male" : "Female"}</span>
-                <span>Age: {study.age}</span>
+                <span>Dataset: {study.dataset || "Montgomery County"}</span>
+                <span>True Label: {study.trueLabel || "Normal"}</span>
               </div>
               <div className="text-[9px] text-gray-500 mt-1 flex space-x-3">
-                <span>Acq. Date: {study.acquisitionDate.split(' ')[0]}</span>
-                <span>Acq. Time: {study.acquisitionDate.split(' ').slice(1).join(' ')}</span>
+                <span>Age / Sex: {study.age}y / {study.sex}</span>
               </div>
             </div>
           </div>
@@ -118,14 +119,14 @@ export default function RightIntelligence({ study, results, loading, checklist, 
 
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
-            <span className="text-[9px] text-gray-500 block">CONFIDENCE</span>
+            <span className="text-[9px] text-gray-500 block">MODEL SCORE</span>
             <span className="text-xs font-bold text-white">
-              {Math.round(results.classical_svm_confidence * 100)}%
+              {Number.isNaN(results.classical_svm_confidence) ? "N/A" : `${Math.round(results.classical_svm_confidence * 100)}%`}
             </span>
           </div>
           <div>
-            <span className="text-[9px] text-gray-500 block">ACCURACY</span>
-            <span className="text-xs font-bold text-white">92.4%</span>
+            <span className="text-[9px] text-gray-500 block">PREDICTION</span>
+            <span className="text-[10px] font-bold text-white uppercase">{results.prediction}</span>
           </div>
           <div>
             <span className="text-[9px] text-gray-500 block">LATENCY</span>
@@ -136,7 +137,7 @@ export default function RightIntelligence({ study, results, loading, checklist, 
         <div className="w-full bg-gray-950 h-1 rounded-full overflow-hidden">
           <div
             className="bg-blue-500 h-full transition-all duration-500"
-            style={{ width: `${results.classical_svm_confidence * 100}%` }}
+            style={{ width: `${Number.isNaN(results.classical_svm_confidence) ? 0 : results.classical_svm_confidence * 100}%` }}
           ></div>
         </div>
       </div>
@@ -150,14 +151,14 @@ export default function RightIntelligence({ study, results, loading, checklist, 
 
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
-            <span className="text-[9px] text-gray-500 block">CONFIDENCE</span>
+            <span className="text-[9px] text-gray-500 block">DECISION SCORE</span>
             <span className="text-xs font-bold text-white">
-              {Math.round(results.quantum_svm_confidence * 100)}%
+              {Number.isNaN(results.quantum_svm_confidence) ? "N/A" : `${Math.round(results.quantum_svm_confidence * 100)}%`}
             </span>
           </div>
           <div>
-            <span className="text-[9px] text-gray-500 block">ACCURACY</span>
-            <span className="text-xs font-bold text-white">91.8%</span>
+            <span className="text-[9px] text-gray-500 block">PREDICTION</span>
+            <span className="text-[10px] font-bold text-white uppercase">{results.prediction}</span>
           </div>
           <div>
             <span className="text-[9px] text-gray-500 block">LATENCY</span>
@@ -168,7 +169,7 @@ export default function RightIntelligence({ study, results, loading, checklist, 
         <div className="w-full bg-gray-950 h-1 rounded-full overflow-hidden">
           <div
             className="bg-purple-500 h-full transition-all duration-500"
-            style={{ width: `${results.quantum_svm_confidence * 100}%` }}
+            style={{ width: `${Number.isNaN(results.quantum_svm_confidence) ? 0 : results.quantum_svm_confidence * 100}%` }}
           ></div>
         </div>
       </div>
@@ -194,11 +195,11 @@ export default function RightIntelligence({ study, results, loading, checklist, 
           <div className="p-3 border-t border-gray-800 text-[9px] text-gray-500 space-y-1.5 bg-[#0d1117] divide-y divide-gray-850">
             <div className="flex justify-between py-1">
               <span>FEATURE MAP:</span>
-              <span className="text-gray-300">ZZFeatureMap</span>
+              <span className="text-gray-300">{results.feature_map || "ZZFeatureMap"}</span>
             </div>
             <div className="flex justify-between py-1">
               <span>SIMULATOR:</span>
-              <span className="text-gray-300">AerSimulator</span>
+              <span className="text-gray-300">{results.simulator || "AerSimulator"}</span>
             </div>
             <div className="flex justify-between py-1">
               <span>QUBITS / PCA DIMS:</span>

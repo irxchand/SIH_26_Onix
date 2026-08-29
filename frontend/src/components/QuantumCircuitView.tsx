@@ -4,9 +4,14 @@ import React, { useEffect, useState } from "react";
 
 interface QuantumCircuitViewProps {
   isAnimating: boolean;
+  metrics?: {
+    qubits: number;
+    circuitDepth: number;
+    featureMap: string;
+  };
 }
 
-export default function QuantumCircuitView({ isAnimating }: QuantumCircuitViewProps) {
+export default function QuantumCircuitView({ isAnimating, metrics }: QuantumCircuitViewProps) {
   const [activeStep, setActiveStep] = useState(-1);
 
   useEffect(() => {
@@ -24,7 +29,8 @@ export default function QuantumCircuitView({ isAnimating }: QuantumCircuitViewPr
     return () => clearInterval(timer);
   }, [isAnimating]);
 
-  const qubits = Array.from({ length: 8 }, (_, i) => `q${i}`);
+  const numQubits = metrics?.qubits || 8;
+  const qubits = Array.from({ length: Math.min(numQubits, 8) }, (_, i) => `q${i}`); // Cap visually to 8 for UI layout
 
   // Coordinate setup for drawing paths
   const stepX = [50, 90, 130, 170, 210, 250];
@@ -33,7 +39,7 @@ export default function QuantumCircuitView({ isAnimating }: QuantumCircuitViewPr
     <div className="border border-gray-800 rounded-lg p-3 bg-[#0d1117] space-y-3 font-mono">
       <div className="flex items-center justify-between border-b border-gray-850 pb-2 mb-2">
         <span className="text-[10px] text-purple-400 font-bold tracking-wider">QUANTUM CIRCUIT REGISTER</span>
-        <span className="text-[9px] text-gray-500">ZZFEATUREMAP / 8 QUBITS</span>
+        <span className="text-[9px] text-gray-500 uppercase">{metrics?.featureMap || 'ZZFEATUREMAP'} / {numQubits} QUBITS</span>
       </div>
 
       <div className="relative w-full h-[150px] bg-[#07090e] border border-gray-900 rounded p-1 overflow-x-auto flex items-center justify-center">

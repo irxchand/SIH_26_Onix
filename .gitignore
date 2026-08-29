@@ -27,3 +27,5 @@ htmlcov/
 .tox/
 
 __pycache__/
+
+data/

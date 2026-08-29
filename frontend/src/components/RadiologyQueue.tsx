@@ -38,83 +38,62 @@ export default function RadiologyQueue({ studies, onSelectStudy }: RadiologyQueu
         <table className="w-full text-left text-xs font-mono">
           <thead>
             <tr className="border-b border-gray-850 bg-[#0c0f16] text-gray-500 text-[10px] tracking-wider uppercase">
-              <th className="py-2.5 px-4">Exam Desc</th>
-              <th className="py-2.5 px-4">Patient</th>
-              <th className="py-2.5 px-4 text-center">Age</th>
-              <th className="py-2.5 px-4 text-center">Issues</th>
-              <th className="py-2.5 px-4 text-center">BI-RADS</th>
+              <th className="py-2.5 px-4">Study ID</th>
+              <th className="py-2.5 px-4">Dataset</th>
+              <th className="py-2.5 px-4 text-center">Age / Sex</th>
+              <th className="py-2.5 px-4 text-center">True Label</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-850 text-gray-300">
             {filtered.map((study) => {
-              const statusColors = {
-                READY: "text-blue-400 bg-blue-950/20 border border-blue-900/55",
-                ANALYZING: "text-yellow-400 bg-yellow-950/20 border border-yellow-900/55 animate-pulse",
-                COMPLETE: "text-green-400 bg-green-950/20 border border-green-900/55",
-                REVIEW: "text-red-400 bg-red-950/20 border border-red-900/55",
-              };
-
               return (
                 <React.Fragment key={study.id}>
                   <tr 
                     className={`hover:bg-gray-850/20 transition-colors cursor-pointer ${expandedStudyId === study.id ? 'bg-[#111827]' : ''}`}
                     onClick={() => setExpandedStudyId(expandedStudyId === study.id ? null : study.id)}
                   >
-                    <td className="py-3.5 px-4 text-gray-400">{study.examDesc || study.modality}</td>
-                    <td className="py-3.5 px-4 font-bold text-white">{study.patientName}</td>
-                    <td className="py-3.5 px-4 text-center text-gray-500">{study.age}</td>
+                    <td className="py-3.5 px-4 font-bold text-white">{study.id}</td>
+                    <td className="py-3.5 px-4 text-gray-400">{study.dataset || "Montgomery County"}</td>
+                    <td className="py-3.5 px-4 text-center text-gray-500">{study.age}y / {study.sex}</td>
                     <td className="py-3.5 px-4 text-center">
-                      {(study.issuesCount || 0) > 0 ? (
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-950 text-red-400 text-[10px]">
-                          {study.issuesCount}
-                        </span>
-                      ) : (
-                        <span className="text-gray-600">-</span>
-                      )}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+                        study.trueLabel === "Tuberculosis" 
+                          ? "bg-red-950/40 text-red-400 border border-red-900/50" 
+                          : "bg-green-950/40 text-green-400 border border-green-900/50"
+                      }`}>
+                        {study.trueLabel || "Normal"}
+                      </span>
                     </td>
-                    <td className="py-3.5 px-4 text-center text-gray-500">{study.birads || "-"}</td>
                   </tr>
                   
                   {/* EXPANDED DETAILS PANEL */}
                   {expandedStudyId === study.id && (
                     <tr className="bg-[#111827] border-b border-gray-800">
-                      <td colSpan={5} className="p-4">
+                      <td colSpan={4} className="p-4">
                         <div className="bg-[#0d1117] border border-gray-800 rounded-lg p-4 font-mono space-y-4">
                           <div className="grid grid-cols-4 gap-4">
                             <div>
-                              <span className="text-gray-500 text-[10px] block">Type:</span>
-                              <span className="text-white text-xs">{study.examDesc || study.modality}</span>
+                              <span className="text-gray-500 text-[10px] block">Study ID:</span>
+                              <span className="text-white text-xs">{study.id}</span>
                             </div>
                             <div>
-                              <span className="text-gray-500 text-[10px] block">Age:</span>
-                              <span className="text-white text-xs">{study.age}</span>
+                              <span className="text-gray-500 text-[10px] block">Dataset Origin:</span>
+                              <span className="text-white text-xs">{study.dataset || "Montgomery County"}</span>
                             </div>
                             <div>
-                              <span className="text-gray-500 text-[10px] block">Issues:</span>
-                              <span className="text-white text-xs">{study.issuesCount || 0}</span>
+                              <span className="text-gray-500 text-[10px] block">True Label:</span>
+                              <span className="text-white text-xs">{study.trueLabel || "Normal"}</span>
                             </div>
                             <div>
-                              <span className="text-gray-500 text-[10px] block">Med. Doctor:</span>
-                              <span className="text-white text-xs">{study.referringPhysician || "N/A"}</span>
+                              <span className="text-gray-500 text-[10px] block">Age / Sex:</span>
+                              <span className="text-white text-xs">{study.age}y / {study.sex}</span>
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-4 border-t border-gray-850 pt-3 mt-3">
+                          <div className="grid grid-cols-1 gap-4 border-t border-gray-850 pt-3 mt-3">
                             <div>
-                              <span className="text-gray-500 text-[10px] block">Referring Physician:</span>
-                              <span className="text-gray-300 text-xs">{study.referringPhysician || "N/A"}</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500 text-[10px] block">Signs/Symptoms:</span>
-                              <span className="text-gray-300 text-xs">Chest pain, dizziness</span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500 text-[10px] block">History:</span>
-                              <span className="text-gray-300 text-xs">{study.history || "N/A"}</span>
-                            </div>
-                            <div className="col-span-2">
-                              <span className="text-gray-500 text-[10px] block">Comments:</span>
-                              <span className="text-gray-300 text-xs">{study.comments || "N/A"}</span>
+                              <span className="text-gray-500 text-[10px] block">Clinical Readings & Metadata:</span>
+                              <span className="text-gray-300 text-xs italic">{study.comments || "No reading available"}</span>
                             </div>
                           </div>
                           
@@ -129,12 +108,7 @@ export default function RadiologyQueue({ studies, onSelectStudy }: RadiologyQueu
                               Select for analysis
                             </button>
                             <div className="space-x-2">
-                              <button className="px-4 py-1.5 border border-gray-700 hover:bg-gray-800 text-gray-300 text-[10px] font-bold rounded transition-colors">
-                                Confirm
-                              </button>
-                              <button className="px-4 py-1.5 border border-gray-700 hover:bg-gray-800 text-gray-300 text-[10px] font-bold rounded transition-colors">
-                                Edit
-                              </button>
+                              <span className="text-gray-600 text-[10px]">RESEARCH USE ONLY</span>
                             </div>
                           </div>
                         </div>

@@ -1,44 +1,36 @@
-import torch
-import torchvision.transforms as transforms
-from PIL import Image
-import numpy as np
+"""
+src/data/segmentation.py
 
-class UNetSegmenter:
-    def __init__(self, model_path=None):
-        """Initializes the segmentation model shell."""
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Initialized UNetSegmenter on {self.device}")
-        # TODO: Load actual pretrained U-Net model here.
-        # self.model = load_model(model_path).to(self.device)
-        # self.model.eval()
-        
-    def segment_lung(self, image_path: str) -> np.ndarray:
-        """
-        Loads a CXR image and applies a U-Net mask (mocked for now).
-        Returns the segmented lung mask as a numpy array.
-        """
-        print(f"Processing image for segmentation: {image_path}")
-        try:
-            img = Image.open(image_path).convert("RGB")
-        except Exception as e:
-            print(f"Error loading image {image_path}: {e}")
-            return None
-            
-        # Basic transform mock
-        transform = transforms.Compose([
-            transforms.Resize((256, 256)),
-            transforms.ToTensor(),
-        ])
-        
-        img_tensor = transform(img).unsqueeze(0).to(self.device)
-        
-        # Mock inference: just return a dummy mask of 1s in the center
-        # In reality, this would be: mask = self.model(img_tensor)
-        print("Running mock U-Net inference...")
-        dummy_mask = np.zeros((256, 256), dtype=np.uint8)
-        dummy_mask[50:200, 50:200] = 1  # Dummy central lung mask
-        
-        return dummy_mask
+AUTOMATED SEGMENTATION — Phase 1 Status: NOT IMPLEMENTED
 
-if __name__ == "__main__":
-    print("Segmentation script shell loaded.")
+This module is a placeholder for a future automated lung segmentation model.
+
+Current Phase 1 segmentation strategy:
+  - For Montgomery dataset studies: expert-annotated manual masks from the dataset
+    are used (GT_LUNG_MASKED, GT_LUNG_CROPPED representations).
+  - For uploaded studies without masks: Otsu-thresholding via src/ml/segmentation.py
+    is used as a rough anatomical approximation (not a trained model prediction).
+
+These are explicitly labeled in the API response confidence field:
+  - 1.0 → ground-truth manual mask (Montgomery)
+  - 0.0 → Otsu heuristic fallback (no model, no trained inference)
+
+FUTURE WORK:
+  A proper pretrained lung segmentation model (e.g., U-Net trained on JSRT/NIH CXR datasets)
+  can be integrated here once validated. It must be:
+  - Evaluated on a held-out segmentation benchmark before use
+  - Labeled as AUTOMATED_SEGMENTATION (not GROUND_TRUTH_REFERENCE)
+  - Not mixed with the Montgomery GT masks for the controlled Track B comparisons
+
+  The activate representations would then become:
+    AUTO_LUNG_MASKED  — background zeroed using automated mask
+    AUTO_LUNG_CROPPED — tight bounding box crop using automated mask
+
+DO NOT:
+  - Return dummy masks as if they were real segmentation outputs
+  - Label automated masks as ground-truth
+  - Use this module in any scientific pipeline until a validated model is in place
+"""
+
+# No executable code here — see src/ml/segmentation.py for the active implementation
+# (get_montgomery_mask_contours and get_lung_contours_svg)

@@ -34,6 +34,8 @@ class StudyResponse(BaseModel):
     history: Optional[str] = None
     comments: Optional[str] = None
     attending: Optional[str] = None
+    dataset: Optional[str] = None
+    trueLabel: Optional[str] = None
 
 
 class QueueResponse(BaseModel):

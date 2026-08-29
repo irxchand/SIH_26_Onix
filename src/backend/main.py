@@ -7,6 +7,9 @@ import os
 import time
 import uuid
 import shutil
+import cv2
+import random
+from datetime import datetime
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -38,129 +41,135 @@ from src.backend.schemas import (
 STUDIES: dict[str, dict] = {}
 UPLOADS_DIR = Path("data/uploads")
 
+from src.ml.segmentation import get_lung_contours_svg, get_montgomery_mask_contours
+
 # Pre-seed the store with demonstration studies
-_SEED_STUDIES = [
-    {
-        "id": "XR-2026-00421",
-        "patientId": "PT-8802",
-        "patientName": "Mariam Holden",
-        "age": 55,
-        "sex": "F",
-        "modality": "CHEST X-RAY (PA)",
-        "acquisitionDate": "29 AUG 2026 04:12",
-        "status": StudyStatus.READY,
-        "imageUrl": "http://localhost:8000/uploads/mock_xray_normal.jpg",
-        "examDesc": "Chest X-ray",
-        "issuesCount": 2,
-        "birads": "2",
-        "referringPhysician": "BORGES, Emilio",
-        "history": "Heart attack, stroke on left side of brain",
-        "comments": "Patient frequently complains of headaches, nausea, chest pains",
-        "attending": "BORGES, Emilio",
-    },
-    {
-        "id": "XR-2026-00512",
-        "patientId": "PT-9410",
-        "patientName": "Emmanuel Mack",
-        "age": 62,
-        "sex": "M",
-        "modality": "CHEST X-RAY (PA)",
-        "acquisitionDate": "29 AUG 2026 03:30",
-        "status": StudyStatus.COMPLETE,
-        "imageUrl": "http://localhost:8000/uploads/mock_xray_anomaly.jpg",
-        "examDesc": "Abdominal X-ray",
-        "issuesCount": 0,
-        "birads": "1",
-        "referringPhysician": "SMITH, John",
-        "history": "None",
-        "comments": "Routine checkup",
-        "attending": "SMITH, John",
-    },
-    {
-        "id": "XR-2026-00513",
-        "patientId": "PT-2091",
-        "patientName": "Ricardo Horton",
-        "age": 48,
-        "sex": "M",
-        "modality": "CHEST X-RAY (AP)",
-        "acquisitionDate": "29 AUG 2026 02:15",
-        "status": StudyStatus.REVIEW,
-        "imageUrl": "http://localhost:8000/uploads/mock_xray_anomaly2.jpg",
-        "examDesc": "Venography",
-        "issuesCount": 1,
-        "birads": "3",
-        "referringPhysician": "DAVIS, Alan",
-        "history": "High blood pressure",
-        "comments": "Patient reports dizziness",
-        "attending": "DAVIS, Alan",
-    },
-    {
-        "id": "XR-2026-00514",
-        "patientId": "PT-1102",
-        "patientName": "Sarah Davis",
-        "age": 29,
-        "sex": "F",
-        "modality": "CHEST X-RAY (PA)",
-        "acquisitionDate": "28 AUG 2026 19:40",
-        "status": StudyStatus.READY,
-        "imageUrl": "http://localhost:8000/uploads/mock_xray_normal2.jpg",
-        "examDesc": "Chest X-ray",
-        "issuesCount": 0,
-        "birads": "1",
-        "referringPhysician": "RODRIGUEZ, Maria",
-        "history": "None",
-        "comments": "No significant findings",
-        "attending": "RODRIGUEZ, Maria",
-    },
-]
+# (Removed mock _SEED_STUDIES to prevent fake patient profiles)
 
 
 # ---------------------------------------------------------------------------
 # Lifespan — runs once at startup, loads seed data and (eventually) ML models
 # ---------------------------------------------------------------------------
+def get_study_filepath(image_url: str) -> Path:
+    """Helper to resolve the local filesystem path of an image URL."""
+    filename = image_url.split("/")[-1]
+    if "datasets" in image_url:
+        return Path("data/datasets/montgomery/MontgomerySet/CXR_png") / filename
+    else:
+        return UPLOADS_DIR / filename
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Ensure upload directory exists
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Seed studies
-    for s in _SEED_STUDIES:
-        s["version"] = 1
-        s["calibration"] = {"brightness": 100, "contrast": 100, "sharpness": 100}
-        s["measurements"] = None
-        s["annotations"] = []
-        # Keep existing evidence if any, else []
-        if "evidence" not in s:
-            s["evidence"] = []
-        STUDIES[s["id"]] = s
+    # Seed studies from the Montgomery test split dataset
+    test_split_path = Path("data/experiments/test_split.json")
+    if test_split_path.exists():
+        import json
+        with open(test_split_path, "r") as f:
+            test_samples = json.load(f)
+        for idx, item in enumerate(test_samples):
+            study_id = item["studyId"]
+            img_url = f"http://localhost:8000/datasets/montgomery/MontgomerySet/CXR_png/{item['filename']}"
+            s = {
+                "id": study_id,
+                "patientId": study_id,
+                "patientName": f"Montgomery Sample {idx+1}",
+                "age": item["age"],
+                "sex": item["sex"],
+                "modality": "CHEST X-RAY (PA)",
+                "acquisitionDate": time.strftime("%d %b %Y %H:%M").upper(),
+                "status": StudyStatus.READY,
+                "imageUrl": img_url,
+                "examDesc": "Chest X-ray (PA)",
+                "dataset": "Montgomery County",
+                "trueLabel": item["label"],
+                "history": "No prior history recorded.",
+                "comments": item["comments"],
+                "version": 1,
+                "calibration": {"brightness": 100, "contrast": 100, "sharpness": 100},
+                "measurements": None,
+                "annotations": [],
+                "evidence": []
+            }
+            STUDIES[study_id] = s
+    else:
+        raise RuntimeError("Strict Mode: Montgomery test split dataset index missing! Please run 'python -m src.ml.qsvm' first.")
 
     print(f"[STARTUP] Seeded {len(STUDIES)} studies into in-memory store.")
     print(f"[STARTUP] Upload directory: {UPLOADS_DIR.resolve()}")
 
-    # Load pre-trained DenseNet121 model
-    from src.ml.feature_extraction import DenseNetFeatureExtractor
-    app.state.feature_extractor = DenseNetFeatureExtractor()
-    print("[STARTUP] Pre-trained DenseNet121 weights loaded into memory.")
-
-    # Load Phase 3 QSVM & PCA weights
-    import subprocess
+    # ── ML weights ────────────────────────────────────────────────────────
+    import json as _json
     from src.ml.qsvm import load_weights
-    
-    pca_path = "src/ml/weights/pca.pkl"
-    qsvm_path = "src/ml/weights/qsvm.pkl"
-    if not os.path.exists(pca_path) or not os.path.exists(qsvm_path):
-        print("[STARTUP] QSVM weights missing. Simulating training pipeline...")
-        subprocess.run(["python", "-m", "src.ml.qsvm"], check=True)
-        
-    app.state.pca = load_weights(pca_path)
-    app.state.qsvm = load_weights(qsvm_path)
-    print("[STARTUP] PCA & QSVM weights loaded into memory.")
 
-    # In future, U-Net would be loaded here. For now we use the mock SVG paths.
-    
+    weights_dir   = Path("src/ml/weights")
+    required = ["scaler.pkl", "pca.pkl", "classical_svm.pkl",
+                "pca_quantum.pkl", "qsvm.pkl", "thresholds.pkl", "config.pkl"]
+    missing = [w for w in required if not (weights_dir / w).exists()]
+    if missing:
+        print(f"[STARTUP] Missing weights: {missing}. Running optimizer...")
+        import subprocess
+        subprocess.run(["python", "-m", "src.ml.optimize"], check=True)
+
+    # Load optimizer config to know which encoder+representation was selected
+    cfg = load_weights(str(weights_dir / "config.pkl"))
+    print(f"[STARTUP] Optimizer config: {cfg}")
+
+    # Load the feature extractor matching Track A encoder/representation
+    from src.ml.feature_extraction import CXRFeatureExtractor
+    _REPR_MAP = {"WHOLE_CXR": "whole", "GT_LUNG_MASKED": "masked", "GT_LUNG_CROPPED": "cropped"}
+    app.state.feature_extractor = CXRFeatureExtractor(
+        encoder=cfg["encoder"],
+        representation=_REPR_MAP.get(cfg.get("track_a_representation", "WHOLE_CXR"), "whole"),
+        clahe=True,
+    )
+    app.state.track_a_repr_label = cfg.get("track_a_representation", "WHOLE_CXR")
+    app.state.track_b_repr_label = cfg.get("track_b_representation", "WHOLE_CXR")
+    print(f"[STARTUP] Encoder={cfg['encoder']}  TrackA_repr={app.state.track_a_repr_label}")
+
+    # Load QSVM feature extractor (may use same or different repr)
+    _qb_repr = _REPR_MAP.get(cfg.get("track_b_representation", "WHOLE_CXR"), "whole")
+    if cfg.get("track_b_representation") == cfg.get("track_a_representation"):
+        app.state.qsvm_feature_extractor = app.state.feature_extractor
+    else:
+        app.state.qsvm_feature_extractor = CXRFeatureExtractor(
+            encoder=cfg["encoder"], representation=_qb_repr, clahe=True
+        )
+    print(f"[STARTUP] QSVM extractor repr={cfg.get('track_b_representation', 'WHOLE_CXR')}")
+
+    # Load weights
+    app.state.scaler          = load_weights(str(weights_dir / "scaler.pkl"))
+    app.state.pca             = load_weights(str(weights_dir / "pca.pkl"))
+    app.state.classical_svm   = load_weights(str(weights_dir / "classical_svm.pkl"))
+    app.state.pca_quantum     = load_weights(str(weights_dir / "pca_quantum.pkl"))
+    app.state.qsvm            = load_weights(str(weights_dir / "qsvm.pkl"))
+    thresholds                = load_weights(str(weights_dir / "thresholds.pkl"))
+    app.state.classical_thresh = float(thresholds.get("classical_thresh", 0.0))
+    app.state.quantum_thresh   = float(thresholds.get("quantum_thresh",   0.0))
+    app.state.ml_config        = cfg
+    print(f"[STARTUP] Weights loaded. Classical thresh={app.state.classical_thresh:.4f}  Quantum thresh={app.state.quantum_thresh:.4f}")
+
+    # Load separate scaler for quantum path if Track B used different representation
+    # (optimizer saves a single scaler based on Track A; Track B re-fits its own)
+    # For now quantum path reuses Track A scaler — acceptable because same encoder
+    app.state.qsvm_scaler = app.state.scaler
+
+    # Load training kernel reference points (needed for quantum kernel eval)
+    x_train_path = weights_dir / "x_train.pkl"
+    if x_train_path.exists():
+        app.state.X_train_pca = load_weights(str(x_train_path))
+    else:
+        app.state.X_train_pca = None
+        print("[STARTUP WARNING] x_train.pkl missing — QSVM inference will fail.")
+
+    print("[STARTUP] All ML weights loaded successfully.")
+
     yield
 
     print("[SHUTDOWN] Cleaning up resources.")
+
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +193,8 @@ app.add_middleware(
 
 # Serve uploaded images as static files
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR), check_dir=False), name="uploads")
+# Serve dataset images as static files
+app.mount("/datasets", StaticFiles(directory="data/datasets", check_dir=False), name="datasets")
 
 
 # ===========================================================================
@@ -305,23 +316,31 @@ async def upload_image(file: UploadFile = File(...)):
 # GET /api/v1/studies/{id}/metadata
 # ---------------------------------------------------------------------------
 @app.get("/api/v1/studies/{study_id}/metadata", response_model=MetadataResponse)
-async def get_metadata(study_id: str):
+async def get_study_metadata(study_id: str):
     if study_id not in STUDIES:
         raise HTTPException(status_code=404, detail=f"Study {study_id} not found.")
-
+        
     study = STUDIES[study_id]
+    filepath = get_study_filepath(study["imageUrl"])
+    
+    width, height = 2048, 2048 # Fallback
+    pixel_spacing = 0.143
+    if filepath.exists():
+        img = cv2.imread(str(filepath))
+        if img is not None:
+            height, width = img.shape[:2]
+            # Heuristic: assume average chest width is ~350mm
+            pixel_spacing = 350.0 / width
 
-    # In Phase 3, this will read actual DICOM headers.
-    # For now, return realistic mock metadata.
     return MetadataResponse(
         studyId=study_id,
-        pixelSpacingMm=0.143,  # Typical CXR pixel spacing
-        width=2048,
-        height=2048,
+        pixelSpacingMm=pixel_spacing,
+        width=width,
+        height=height,
         modality=study["modality"],
         dicomTags={
-            "Manufacturer": "SHIMADZU",
-            "InstitutionName": "SIH26139 Medical Center",
+            "Manufacturer": "NLM",
+            "InstitutionName": "Montgomery County HHS",
             "StudyDescription": study.get("examDesc", "CXR"),
             "PatientAge": str(study["age"]),
             "PatientSex": study["sex"],
@@ -333,31 +352,39 @@ async def get_metadata(study_id: str):
 # GET /api/v1/studies/{id}/segmentation
 # ---------------------------------------------------------------------------
 @app.get("/api/v1/studies/{study_id}/segmentation", response_model=SegmentationResponse)
-async def get_segmentation(study_id: str):
+async def get_segmentation(study_id: str, mode: str = "ground_truth"):
     if study_id not in STUDIES:
         raise HTTPException(status_code=404, detail=f"Study {study_id} not found.")
 
-    # In Phase 3, this will run the actual U-Net model.
-    # For now, return realistic anatomical SVG contour paths.
-    # These paths are normalized to the 0-100% coordinate space of the canvas.
-    left_lung_path = (
-        "M 20 25 C 16 18, 10 22, 8 38 "
-        "C 6 54, 8 68, 12 78 "
-        "C 16 85, 22 88, 28 85 "
-        "C 32 78, 30 42, 20 25 Z"
-    )
-    right_lung_path = (
-        "M 52 25 C 48 18, 42 22, 40 38 "
-        "C 38 54, 40 68, 44 78 "
-        "C 48 85, 54 88, 60 85 "
-        "C 64 78, 62 42, 52 25 Z"
-    )
+    study = STUDIES[study_id]
+    
+    left_lung_path = ""
+    right_lung_path = ""
+    is_gt = False
+    
+    if mode == "ground_truth":
+        # Try reading manual masks first (Montgomery Set ground truth)
+        gt_contours = get_montgomery_mask_contours(study_id)
+        if gt_contours:
+            left_lung_path = gt_contours["leftLung"]
+            right_lung_path = gt_contours["rightLung"]
+            is_gt = True
+            
+    if not is_gt:
+        # Fallback / explicit automated Otsu thresholding
+        filepath = get_study_filepath(study["imageUrl"])
+        if filepath.exists():
+            contours = get_lung_contours_svg(str(filepath))
+            left_lung_path = contours["leftLung"]
+            right_lung_path = contours["rightLung"]
 
     return SegmentationResponse(
         studyId=study_id,
         leftLung=left_lung_path,
         rightLung=right_lung_path,
-        confidence=0.94,
+        # confidence=1.0: ground-truth Montgomery expert mask
+        # confidence=0.0: Otsu heuristic — NOT a model prediction
+        confidence=1.0 if is_gt else 0.0,
     )
 
 
@@ -369,33 +396,52 @@ import numpy as np
 import asyncio
 
 def run_ml_pipeline(app, image_path: str):
-    """Synchronous function to run PyTorch + QSVM pipeline."""
-    # 1. Feature Extraction (DenseNet121)
-    features = app.state.feature_extractor.extract(image_path).numpy()
-    
-    # 2. PCA Compression
-    pca_features = app.state.pca.transform(features.reshape(1, -1))
-    
-    # 3. QSVM Inference
-    qkernel = construct_quantum_kernel()
-    
-    # Since SVC was trained with kernel='precomputed', it expects a kernel matrix row
-    # of shape (1, N_train). We didn't save the training samples, so we generate
-    # a dummy kernel evaluation row matching the expected features.
-    expected_features = app.state.qsvm.n_features_in_
-    dummy_kernel_eval = np.random.rand(1, expected_features)
-    prediction = app.state.qsvm.predict(dummy_kernel_eval)[0]
-    
-    # We don't have probability natively from SVC(kernel="precomputed") unless probability=True,
-    # so we mock confidence scores for the UI.
-    classical_conf = 0.82 if prediction == 0 else 0.87
-    quantum_conf = 0.89 if prediction == 0 else 0.94
-    
+    """
+    Synchronous ML inference pipeline.
+    Uses Track A (classical) and Track B (quantum) configs from the optimizer.
+    Returns honest decision scores — NOT clamped fake probabilities.
+    """
+    import numpy as np
+    from src.ml.qsvm import construct_quantum_kernel
+
+    # ── Track A: Classical inference ─────────────────────────────────────
+    # Uses best encoder + representation + PCA + classifier from optimizer
+    features_a  = app.state.feature_extractor.extract(image_path).numpy()
+    scaled_a    = app.state.scaler.transform(features_a.reshape(1, -1))
+    pca_a       = app.state.pca.transform(scaled_a)          # Track A PCA
+    decision_c  = float(app.state.classical_svm.decision_function(pca_a)[0])
+    prediction_c = 1 if decision_c >= app.state.classical_thresh else 0
+
+    # ── Track B: Quantum inference ────────────────────────────────────────
+    # Same encoder, possibly different representation, fixed PCA-8
+    features_q = app.state.qsvm_feature_extractor.extract(image_path).numpy()
+    scaled_q   = app.state.qsvm_scaler.transform(features_q.reshape(1, -1))
+    pca_q      = app.state.pca_quantum.transform(scaled_q)   # Track B PCA (dim=8)
+
+    if app.state.X_train_pca is not None:
+        qkernel = construct_quantum_kernel()
+        K_test  = qkernel.evaluate(x_vec=pca_q, y_vec=app.state.X_train_pca)
+        decision_q  = float(app.state.qsvm.decision_function(K_test)[0])
+        prediction_q = 1 if decision_q >= app.state.quantum_thresh else 0
+    else:
+        # Graceful fallback: quantum weights missing, use classical
+        decision_q   = decision_c
+        prediction_q = prediction_c
+
+    # ── Final prediction: Track A classical is the demo-facing result ─────
+    # (Track B quantum used for the research comparison panel)
+    final_pred = prediction_c
+
     return {
-        "prediction": "Healthy" if prediction == 0 else "Anomaly Detected",
-        "classical_conf": classical_conf,
-        "quantum_conf": quantum_conf
+        "prediction"   : "Tuberculosis Detected" if final_pred == 1 else "Normal — No TB Detected",
+        "classical_pred": int(prediction_c),
+        "quantum_pred"  : int(prediction_q),
+        "classical_score": decision_c,          # raw decision score, not clamped
+        "quantum_score"  : decision_q,           # raw decision score, not clamped
+        "track_a_repr"  : getattr(app.state, "track_a_repr_label", "WHOLE_CXR"),
+        "track_b_repr"  : getattr(app.state, "track_b_repr_label", "WHOLE_CXR"),
     }
+
 
 @app.get("/api/v1/studies/{study_id}/predict", response_model=PredictionResponse)
 async def predict_study_get(study_id: str):
@@ -406,40 +452,41 @@ async def predict_study_get(study_id: str):
     
     # Extract filename from imageUrl
     image_url = STUDIES[study_id].get("imageUrl", "")
-    filename = image_url.split("/")[-1]
-    filepath = str(UPLOADS_DIR / filename)
+    filepath = get_study_filepath(image_url)
     
     # Run pipeline in a threadpool to avoid blocking event loop
-    if os.path.exists(filepath):
-        res = await asyncio.to_thread(run_ml_pipeline, app, filepath)
+    if filepath.exists():
+        res = await asyncio.to_thread(run_ml_pipeline, app, str(filepath))
     else:
-        # Fallback if image doesn't exist locally
-        res = {
-            "prediction": "Anomaly Detected" if "anomaly" in filename else "Healthy",
-            "classical_conf": 0.87,
-            "quantum_conf": 0.92
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="Source image file not found on backend. Cannot perform inference."
+        )
 
     inference_time = time.time() - start_time
 
+    # Map raw decision scores to [0, 1] range via sigmoid for UI display, but label honestly
+    c_prob = float(1.0 / (1.0 + np.exp(-res["classical_score"])))
+    q_prob = float(1.0 / (1.0 + np.exp(-res["quantum_score"])))
+
     return PredictionResponse(
-        classical_svm_confidence=res["classical_conf"],
-        quantum_svm_confidence=res["quantum_conf"],
+        classical_svm_confidence=c_prob,
+        quantum_svm_confidence=q_prob,
         prediction=res["prediction"],
         inference_time_seconds=inference_time,
         is_mock=False,
-        qubits=8,
+        qubits=int(app.state.ml_config.get("pca_dim_quantum", 8)),
         circuit_depth=16,
         runtime=inference_time,
         feature_map="ZZFeatureMap",
-        simulator="AerSimulator",
+        simulator="StatevectorSampler",
         execution_stage="QSVM_EVALUATION",
         evidence=[
             EvidenceItem(
                 id="E-01",
-                region="RIGHT LOWER LOBE",
-                confidence=res["quantum_conf"],
-                signal=f"{res['prediction']} pattern detected",
+                region="LUNG FIELD",
+                confidence=q_prob,
+                signal=f"QSVM score: {res['quantum_score']:.4f} | Classical: {res['classical_score']:.4f}",
                 xPercent=38,
                 yPercent=68,
             )
@@ -466,24 +513,28 @@ async def predict_image(file: UploadFile = File(...)):
 
     inference_time = time.time() - start_time
 
+    # Map raw decision scores to [0, 1] range via sigmoid for UI display, but label honestly
+    c_prob = float(1.0 / (1.0 + np.exp(-res["classical_score"])))
+    q_prob = float(1.0 / (1.0 + np.exp(-res["quantum_score"])))
+
     return PredictionResponse(
-        classical_svm_confidence=res["classical_conf"],
-        quantum_svm_confidence=res["quantum_conf"],
+        classical_svm_confidence=c_prob,
+        quantum_svm_confidence=q_prob,
         prediction=res["prediction"],
         inference_time_seconds=inference_time,
         is_mock=False,
-        qubits=8,
+        qubits=int(app.state.ml_config.get("pca_dim_quantum", 8)),
         circuit_depth=16,
         runtime=inference_time,
         feature_map="ZZFeatureMap",
-        simulator="AerSimulator",
+        simulator="StatevectorSampler",
         execution_stage="QSVM_EVALUATION",
         evidence=[
             EvidenceItem(
                 id="E-01",
-                region="RIGHT LOWER LOBE",
-                confidence=res["quantum_conf"],
-                signal=f"{res['prediction']} pattern detected",
+                region="LUNG FIELD",
+                confidence=q_prob,
+                signal=f"QSVM score: {res['quantum_score']:.4f} | Classical: {res['classical_score']:.4f}",
                 xPercent=38,
                 yPercent=68,
             )

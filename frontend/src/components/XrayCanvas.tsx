@@ -7,6 +7,7 @@ interface XrayCanvasProps {
   study: Study | null;
   activeMode: ToolMode;
   pixelSpacingMm: number;
+  imageWidth: number;
   brightness: number;
   contrast: number;
   sharpness: number;
@@ -24,6 +25,7 @@ export default function XrayCanvas({
   study,
   activeMode,
   pixelSpacingMm,
+  imageWidth,
   brightness,
   contrast,
   sharpness,
@@ -41,6 +43,7 @@ export default function XrayCanvas({
   const [measurementNote, setMeasurementNote] = useState("");
   const [savedMeasurementIssue, setSavedMeasurementIssue] = useState(false);
   const [segmentationPaths, setSegmentationPaths] = useState<{leftLung: string, rightLung: string} | null>(null);
+  const [segmentationMode, setSegmentationMode] = useState<"ground_truth" | "automated">("ground_truth");
   
   // Annotation states
   const [isDrawing, setIsDrawing] = useState(false);
@@ -65,8 +68,9 @@ export default function XrayCanvas({
   }, [study]);
 
   useEffect(() => {
-    if (activeMode === "SEGMENT" && study && !segmentationPaths) {
-      fetch(`http://localhost:8000/api/v1/studies/${study.id}/segmentation`)
+    if (activeMode === "SEGMENT" && study) {
+      setSegmentationPaths(null); // Reset path
+      fetch(`http://localhost:8000/api/v1/studies/${study.id}/segmentation?mode=${segmentationMode}`)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && data.leftLung && data.rightLung) {
@@ -75,7 +79,7 @@ export default function XrayCanvas({
         })
         .catch(err => console.error("Failed to fetch segmentation:", err));
     }
-  }, [activeMode, study, segmentationPaths]);
+  }, [activeMode, study, segmentationMode]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
@@ -148,10 +152,13 @@ export default function XrayCanvas({
     const hDistPx = Math.abs(heartLeft.x - heartRight.x);
     const cDistPx = Math.abs(chestLeft.x - chestRight.x);
 
-    // Approximate conversion using pixel spacing
-    const scaleFactor = 30; // Assuming 3000px nominal width, 1% = 30px
-    const hDistMm = Math.round(hDistPx * scaleFactor * pixelSpacingMm);
-    const cDistMm = Math.round(cDistPx * scaleFactor * pixelSpacingMm);
+    // True physical conversion using the actual image dimensions fetched from OpenCV
+    // Since coordinates are percentages (0-100), distance in true pixels is: (percentage / 100) * imageWidth
+    const hDistTruePx = (hDistPx / 100.0) * imageWidth;
+    const cDistTruePx = (cDistPx / 100.0) * imageWidth;
+    
+    const hDistMm = Math.round(hDistTruePx * pixelSpacingMm);
+    const cDistMm = Math.round(cDistTruePx * pixelSpacingMm);
     const ratio = cDistMm > 0 ? (hDistMm / cDistMm) : 0;
     
     return { hDistMm, cDistMm, ratio, isComplete: true };
@@ -165,9 +172,33 @@ export default function XrayCanvas({
     <div className="flex flex-col space-y-3 w-full">
       {/* Dynamic Instruction Bar */}
       <div className="bg-[#0d1117] border border-gray-800 rounded px-3 py-1.5 text-[10px] font-mono text-gray-400 flex items-center justify-between">
-        <span>
+        <span className="flex items-center space-x-2">
           {activeMode === "MEASURE" && `[CALIPER MODE]: Click to set landmarks (${getCompletedPoints().length}/${checklist.length} points set)`}
-          {activeMode === "SEGMENT" && "[SEGMENTATION MODE]: Rendering U-Net lung contours"}
+          {activeMode === "SEGMENT" && (
+            <span className="flex items-center space-x-2">
+              <span>[SEGMENTATION]:</span>
+              <button 
+                onClick={() => setSegmentationMode("ground_truth")}
+                className={`px-1.5 py-0.5 rounded text-[8px] font-bold transition-all ${
+                  segmentationMode === "ground_truth" 
+                    ? "bg-purple-900/60 text-purple-300 border border-purple-800" 
+                    : "bg-gray-900/40 text-gray-500 border border-transparent hover:text-gray-300"
+                }`}
+              >
+                Ground Truth Reference
+              </button>
+              <button 
+                onClick={() => setSegmentationMode("automated")}
+                className={`px-1.5 py-0.5 rounded text-[8px] font-bold transition-all ${
+                  segmentationMode === "automated" 
+                    ? "bg-blue-900/60 text-blue-300 border border-blue-800" 
+                    : "bg-gray-900/40 text-gray-500 border border-transparent hover:text-gray-300"
+                }`}
+              >
+                Automated (Otsu Threshold)
+              </button>
+            </span>
+          )}
           {activeMode === "EVIDENCE" && "[EVIDENCE LAYER]: Spatially anchored anomalies active"}
           {activeMode === "SCAN" && "[SCANNING ACTIVE]: Image grid calibration ready"}
           {activeMode === "ANNOTATE" && "[ANNOTATE MODE]: Visual markup active"}
