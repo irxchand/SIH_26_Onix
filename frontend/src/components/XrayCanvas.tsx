@@ -18,6 +18,8 @@ interface XrayCanvasProps {
   onToggleFullscreen: () => void;
   checklist: ChecklistStep[];
   onChecklistUpdate: (updatedChecklist: ChecklistStep[]) => void;
+  imageWidth?: number;
+  imageHeight?: number;
 }
 
 export default function XrayCanvas({
@@ -35,6 +37,8 @@ export default function XrayCanvas({
   onToggleFullscreen,
   checklist,
   onChecklistUpdate,
+  imageWidth,
+  imageHeight,
 }: XrayCanvasProps) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -148,8 +152,8 @@ export default function XrayCanvas({
     const hDistPx = Math.abs(heartLeft.x - heartRight.x);
     const cDistPx = Math.abs(chestLeft.x - chestRight.x);
 
-    // Approximate conversion using pixel spacing
-    const scaleFactor = 30; // Assuming 3000px nominal width, 1% = 30px
+    // True physical conversion using extracted imageWidth and DICOM pixel spacing
+    const scaleFactor = (imageWidth || 3000) / 100; // 1% = X pixels
     const hDistMm = Math.round(hDistPx * scaleFactor * pixelSpacingMm);
     const cDistMm = Math.round(cDistPx * scaleFactor * pixelSpacingMm);
     const ratio = cDistMm > 0 ? (hDistMm / cDistMm) : 0;

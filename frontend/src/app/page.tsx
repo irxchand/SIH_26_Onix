@@ -82,6 +82,8 @@ export default function Home() {
 
   // Checklist state
   const [pixelSpacingMm, setPixelSpacingMm] = useState<number>(0.143);
+  const [imageWidth, setImageWidth] = useState<number>(2048);
+  const [imageHeight, setImageHeight] = useState<number>(2048);
   const [checklist, setChecklist] = useState<ChecklistStep[]>([
     { id: "spine_top", label: "Highest point of the spine", status: "pending" },
     { id: "spine_bottom", label: "Lowest point of the spine", status: "pending" },
@@ -105,10 +107,14 @@ export default function Home() {
       if (res.ok) {
         const meta = await res.json();
         setPixelSpacingMm(meta.pixelSpacingMm || 0.143);
+        if (meta.width) setImageWidth(meta.width);
+        if (meta.height) setImageHeight(meta.height);
       }
     } catch(err) {
       console.error(err);
       setPixelSpacingMm(0.143);
+      setImageWidth(2048);
+      setImageHeight(2048);
     }
     
     // Reset controls
@@ -318,6 +324,8 @@ export default function Home() {
                 onToggleFullscreen={handleToggleFullscreen}
                 checklist={checklist}
                 onChecklistUpdate={handleChecklistUpdate}
+                imageWidth={imageWidth}
+                imageHeight={imageHeight}
               />
 
               {/* Patient Record Card */}

@@ -317,13 +317,24 @@ async def get_metadata(study_id: str):
 
     study = STUDIES[study_id]
 
-    # In Phase 3, this will read actual DICOM headers.
-    # For now, return realistic mock metadata.
+    image_url = study.get("imageUrl", "")
+    filename = image_url.split("/")[-1]
+    filepath = UPLOADS_DIR / filename
+    
+    width, height = 2048, 2048
+    if filepath.exists():
+        from PIL import Image
+        try:
+            with Image.open(filepath) as img:
+                width, height = img.size
+        except Exception:
+            pass
+
     return MetadataResponse(
         studyId=study_id,
         pixelSpacingMm=0.143,  # Typical CXR pixel spacing
-        width=2048,
-        height=2048,
+        width=width,
+        height=height,
         modality=study["modality"],
         dicomTags={
             "Manufacturer": "SHIMADZU",
