@@ -537,9 +537,9 @@ async def predict_image(file: UploadFile = File(...)):
 async def calibrate_study(study_id: str, req: CalibrateRequest):
     if study_id not in STUDIES:
         raise HTTPException(status_code=404, detail="Study not found.")
-    STUDIES[study_id]["calibration"] = req.dict()
+    STUDIES[study_id]["calibration"] = req.model_dump()
     STUDIES[study_id]["version"] += 1
-    return {"status": "success", "calibration": req.dict(), "version": STUDIES[study_id]["version"]}
+    return {"status": "success", "calibration": req.model_dump(), "version": STUDIES[study_id]["version"]}
 
 
 # ---------------------------------------------------------------------------
@@ -553,7 +553,7 @@ async def save_measurements(study_id: str, req: MeasurementRequest):
     if len(req.points) < 6:
         raise HTTPException(status_code=422, detail="Measurement requires at least 6 points.")
         
-    STUDIES[study_id]["measurements"] = req.dict()
+    STUDIES[study_id]["measurements"] = req.model_dump()
     STUDIES[study_id]["version"] += 1
     return {"status": "success", "version": STUDIES[study_id]["version"]}
 

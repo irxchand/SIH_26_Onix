@@ -207,7 +207,7 @@ export default function XrayCanvas({
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
               {/* U-NET SEGMENTATION OVERLAY */}
               {activeMode === "SEGMENT" && segmentationPaths && (
-                <>
+                <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
                   {/* Left Lung overlay */}
                   <path
                     d={segmentationPaths.leftLung}
@@ -215,7 +215,7 @@ export default function XrayCanvas({
                     stroke="#3B82F6"
                     strokeWidth="1.5"
                     strokeDasharray="2 1"
-                    transform="scale(4) translate(5, 5)"
+                    vectorEffect="non-scaling-stroke"
                   />
                   {/* Right Lung overlay */}
                   <path
@@ -224,9 +224,9 @@ export default function XrayCanvas({
                     stroke="#3B82F6"
                     strokeWidth="1.5"
                     strokeDasharray="2 1"
-                    transform="scale(4) translate(5, 5)"
+                    vectorEffect="non-scaling-stroke"
                   />
-                </>
+                </svg>
               )}
 
               {/* CALIPERS / MEASUREMENT MARKERS */}

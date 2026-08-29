@@ -84,7 +84,9 @@ export const mockPredictions: Record<string, PredictionResults> = {
     is_mock: true,
     qubits: 8,
     circuit_depth: 24,
-    runtime: 0.485
+    runtime: 0.485,
+    image_width: 1200,
+    image_height: 896
   },
   "XR-2026-00512": {
     classical_svm_confidence: 0.94,
@@ -94,7 +96,9 @@ export const mockPredictions: Record<string, PredictionResults> = {
     is_mock: true,
     qubits: 8,
     circuit_depth: 24,
-    runtime: 0.512
+    runtime: 0.512,
+    image_width: 1200,
+    image_height: 896
   },
   "XR-2026-00513": {
     classical_svm_confidence: 0.78,
@@ -104,7 +108,9 @@ export const mockPredictions: Record<string, PredictionResults> = {
     is_mock: true,
     qubits: 8,
     circuit_depth: 24,
-    runtime: 0.420
+    runtime: 0.420,
+    image_width: 1200,
+    image_height: 896
   },
   "XR-2026-00514": {
     classical_svm_confidence: 0.96,
@@ -114,7 +120,9 @@ export const mockPredictions: Record<string, PredictionResults> = {
     is_mock: true,
     qubits: 8,
     circuit_depth: 24,
-    runtime: 0.455
+    runtime: 0.455,
+    image_width: 1200,
+    image_height: 896
   }
 };
 

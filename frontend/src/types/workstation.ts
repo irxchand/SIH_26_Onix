@@ -78,4 +78,6 @@ export interface PredictionResults {
   qubits?: number;
   circuit_depth?: number;
   runtime?: number;
+  image_width?: number;
+  image_height?: number;
 }
