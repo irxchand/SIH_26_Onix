@@ -52,9 +52,18 @@ def construct_quantum_kernel() -> FidelityQuantumKernel:
     quantum_kernel = FidelityQuantumKernel(fidelity=fidelity, feature_map=feature_map)
     return quantum_kernel
 
-def train_qsvm(kernel_matrix: np.ndarray, labels: np.ndarray) -> SVC:
+def train_classical_svm(features: np.ndarray, labels: np.ndarray):
+    """Trains a pure classical SVC on the PCA features for fair comparison."""
+    # Use CalibratedClassifierCV instead of SVC(probability=True) to avoid warnings
+    base_svm = SVC(kernel="rbf")
+    csvm = CalibratedClassifierCV(base_svm, ensemble=False)
+    csvm.fit(features, labels)
+    return csvm
+
+def train_qsvm(kernel_matrix: np.ndarray, labels: np.ndarray):
     """Trains a classical SVC using the precomputed quantum kernel matrix."""
-    qsvm = SVC(kernel="precomputed")
+    base_svm = SVC(kernel="precomputed")
+    qsvm = CalibratedClassifierCV(base_svm, ensemble=False)
     qsvm.fit(kernel_matrix, labels)
     return qsvm
 

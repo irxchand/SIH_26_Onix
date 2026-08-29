@@ -330,6 +330,8 @@ export default function Home() {
                 onToggleFullscreen={handleToggleFullscreen}
                 checklist={checklist}
                 onChecklistUpdate={handleChecklistUpdate}
+                imageWidth={imageWidth}
+                imageHeight={imageHeight}
               />
 
               {/* Patient Record Card */}
