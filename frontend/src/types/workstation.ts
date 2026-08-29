@@ -8,6 +8,13 @@ export interface Study {
   acquisitionDate: string;
   status: "READY" | "ANALYZING" | "COMPLETE" | "REVIEW";
   imageUrl: string;
+  examDesc?: string;
+  issuesCount?: number;
+  birads?: string;
+  referringPhysician?: string;
+  history?: string;
+  comments?: string;
+  attending?: string;
 }
 
 export type ToolMode = "SCAN" | "MEASURE" | "ANNOTATE" | "SEGMENT" | "EVIDENCE" | "QUANTUM" | "IMAGE";
@@ -33,6 +40,24 @@ export interface Measurement {
   p1: MeasurementPoint;
   p2: MeasurementPoint;
   distancePx: number;
+}
+
+export type ChecklistStatus = "pending" | "completed";
+
+export interface ChecklistStep {
+  id: string;
+  label: string;
+  status: ChecklistStatus;
+  point?: MeasurementPoint;
+}
+
+export interface IssueAnnotation {
+  id: string;
+  xPercent: number;
+  yPercent: number;
+  measurementStr: string;
+  classification: string;
+  note: string;
 }
 
 export interface EvidenceItem {

@@ -6,7 +6,7 @@ import XrayCanvas from "@/components/XrayCanvas";
 import RightIntelligence from "@/components/RightIntelligence";
 import QuantumCircuitView from "@/components/QuantumCircuitView";
 import RadiologyQueue from "@/components/RadiologyQueue";
-import { Study, ToolMode, PredictionResults, EvidenceItem } from "../types/workstation";
+import { Study, ToolMode, PredictionResults, EvidenceItem, ChecklistStep } from "../types/workstation";
 import { mockStudies, mockPredictions, mockEvidence } from "../mock/studies";
 
 const PIPELINE_STAGES = [
@@ -44,6 +44,20 @@ export default function Home() {
   // Custom study uploads
   const [studies, setStudies] = useState<Study[]>(mockStudies);
 
+  // Checklist state
+  const [checklist, setChecklist] = useState<ChecklistStep[]>([
+    { id: "spine_top", label: "Highest point of the spine", status: "pending" },
+    { id: "spine_bottom", label: "Lowest point of the spine", status: "pending" },
+    { id: "heart_right", label: "Right side of the heart at its widest point", status: "pending" },
+    { id: "heart_left", label: "Left side of the heart at its widest point", status: "pending" },
+    { id: "chest_right", label: "Right side of the chest at its widest point", status: "pending" },
+    { id: "chest_left", label: "Left side of the chest at its widest point", status: "pending" }
+  ]);
+
+  const handleChecklistUpdate = (updatedChecklist: ChecklistStep[]) => {
+    setChecklist(updatedChecklist);
+  };
+
   const handleSelectStudy = (study: Study) => {
     setSelectedStudy(study);
     setViewMode("WORKSPACE");
@@ -56,6 +70,9 @@ export default function Home() {
     setResults(null);
     setEvidence([]);
     setError(null);
+    
+    // Reset checklist
+    setChecklist(checklist.map(item => ({ ...item, status: "pending", point: undefined })));
     
     // Trigger analysis automatically
     triggerWorkflow(study);
@@ -219,6 +236,8 @@ export default function Home() {
                 onZoomOut={handleZoomOut}
                 onReset={handleResetZoom}
                 onToggleFullscreen={handleToggleFullscreen}
+                checklist={checklist}
+                onChecklistUpdate={handleChecklistUpdate}
               />
 
               {/* Patient Record Card */}
@@ -271,7 +290,14 @@ export default function Home() {
                 </div>
               ) : (
                 <>
-                  <RightIntelligence results={results} loading={loading} />
+                  <RightIntelligence 
+                    study={selectedStudy}
+                    results={results} 
+                    loading={loading} 
+                    checklist={checklist}
+                    onAccept={() => alert("Study Accepted")}
+                    onReject={() => alert("Study Rejected")}
+                  />
                   
                   {/* Quantum circuit board visualization */}
                   <QuantumCircuitView isAnimating={activeStageIdx >= 5 || loading} />

@@ -1,14 +1,18 @@
 "use client";
 
 import React, { useState } from "react";
-import { PredictionResults } from "../types/workstation";
+import { PredictionResults, Study, ChecklistStep } from "../types/workstation";
 
 interface RightIntelligenceProps {
+  study: Study | null;
   results: PredictionResults | null;
   loading: boolean;
+  checklist: ChecklistStep[];
+  onAccept: () => void;
+  onReject: () => void;
 }
 
-export default function RightIntelligence({ results, loading }: RightIntelligenceProps) {
+export default function RightIntelligence({ study, results, loading, checklist, onAccept, onReject }: RightIntelligenceProps) {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
   if (loading) {
@@ -34,6 +38,54 @@ export default function RightIntelligence({ results, loading }: RightIntelligenc
 
   return (
     <div className="w-full space-y-4 font-mono">
+      {/* CHECKLIST */}
+      <div className="border border-gray-800 rounded-lg p-3 bg-[#0d1117] space-y-3 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-8 h-8 bg-[#111827] flex items-center justify-center rounded-bl-lg border-l border-b border-gray-800 cursor-pointer hover:bg-gray-800">
+          <span className="text-gray-400 text-xs">✕</span>
+        </div>
+        <span className="text-[10px] text-blue-400 font-bold tracking-widest block border-b border-gray-850 pb-2">
+          Check the location of the points
+        </span>
+        <ul className="space-y-1">
+          {checklist.map((item, idx) => (
+            <li key={item.id} className={`flex items-center text-[10px] ${item.status === 'completed' ? 'text-white' : 'text-gray-500'}`}>
+              <span className={`w-3 h-3 rounded-full mr-2 flex items-center justify-center text-[8px] ${item.status === 'completed' ? 'bg-blue-500 text-white' : 'bg-gray-800 text-gray-500'}`}>
+                {item.status === 'completed' ? '✓' : idx + 1}
+              </span>
+              {item.label}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* PATIENT & ACCEPT/REJECT (From the video UI) */}
+      {study && (
+        <div className="border border-gray-800 rounded-lg p-3 bg-[#0d1117] space-y-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="text-xs font-bold text-white">{study.patientName} / ID: {study.patientId}</h3>
+              <div className="text-[9px] text-gray-500 mt-1 flex space-x-3">
+                <span>Sex: {study.sex === "M" ? "Male" : "Female"}</span>
+                <span>Age: {study.age}</span>
+              </div>
+              <div className="text-[9px] text-gray-500 mt-1 flex space-x-3">
+                <span>Acq. Date: {study.acquisitionDate.split(' ')[0]}</span>
+                <span>Acq. Time: {study.acquisitionDate.split(' ').slice(1).join(' ')}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex space-x-2 pt-2 border-t border-gray-850">
+            <button onClick={onAccept} className="flex-1 bg-[#1a3b30] hover:bg-[#254f41] text-emerald-400 border border-[#235845] py-1.5 rounded text-[10px] font-bold transition-colors">
+              Accept ✓
+            </button>
+            <button onClick={onReject} className="flex-1 bg-[#3b1a1a] hover:bg-[#4f2525] text-red-400 border border-[#582323] py-1.5 rounded text-[10px] font-bold transition-colors">
+              Reject ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* MODEL CONSENSUS */}
       <div className="border border-gray-800 rounded-lg p-3 bg-[#0d1117] space-y-3">
         <span className="text-[10px] text-gray-500 tracking-widest block">MODEL CONSENSUS</span>
