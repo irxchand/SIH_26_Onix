@@ -21,6 +21,8 @@ interface XrayCanvasProps {
   onChecklistUpdate: (updatedChecklist: ChecklistStep[]) => void;
   imageHeight?: number;
   annoTrigger?: number;
+  activePinId?: string | null;
+  onHoverPin?: (id: string | null) => void;
 }
 
 export default function XrayCanvas({
@@ -41,6 +43,8 @@ export default function XrayCanvas({
   onChecklistUpdate,
   imageHeight,
   annoTrigger,
+  activePinId = null,
+  onHoverPin,
 }: XrayCanvasProps) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -357,7 +361,7 @@ export default function XrayCanvas({
             {/* SVG Interactive Drawing Plane */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
               {/* U-NET SEGMENTATION OVERLAY */}
-              {activeMode === "SEGMENT" && segmentationPaths && (
+              {(activeMode === "SEGMENT" || activeMode === "EVIDENCE") && segmentationPaths && (
                 <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
                   {/* Left Lung overlay */}
                   <path

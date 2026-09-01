@@ -41,7 +41,7 @@ export default function RadiologyQueue({ studies, onSelectStudy }: RadiologyQueu
               <th className="py-2.5 px-4">Study ID</th>
               <th className="py-2.5 px-4">Dataset</th>
               <th className="py-2.5 px-4 text-center">Age / Sex</th>
-              <th className="py-2.5 px-4 text-center">True Label</th>
+              <th className="py-2.5 px-4 text-center">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-850 text-gray-300">
@@ -54,14 +54,10 @@ export default function RadiologyQueue({ studies, onSelectStudy }: RadiologyQueu
                   >
                     <td className="py-3.5 px-4 font-bold text-white">{study.id}</td>
                     <td className="py-3.5 px-4 text-gray-400">{study.dataset || "Montgomery County"}</td>
-                    <td className="py-3.5 px-4 text-center text-gray-500">{study.age}y / {study.sex}</td>
+                    <td className="py-3.5 px-4 text-center text-gray-500">{study.id.startsWith("UPLOAD_") || !study.age || study.sex === "N/A" || study.sex === "U" ? "N/A" : `${study.age}y / ${study.sex}`}</td>
                     <td className="py-3.5 px-4 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                        study.trueLabel === "Tuberculosis" 
-                          ? "bg-red-950/40 text-red-400 border border-red-900/50" 
-                          : "bg-green-950/40 text-green-400 border border-green-900/50"
-                      }`}>
-                        {study.trueLabel || "Normal"}
+                      <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-950/40 text-emerald-400 border border-emerald-900/50">
+                        {study.status || "READY"}
                       </span>
                     </td>
                   </tr>
@@ -81,12 +77,12 @@ export default function RadiologyQueue({ studies, onSelectStudy }: RadiologyQueu
                               <span className="text-white text-xs">{study.dataset || "Montgomery County"}</span>
                             </div>
                             <div>
-                              <span className="text-gray-500 text-[10px] block">True Label:</span>
-                              <span className="text-white text-xs">{study.trueLabel || "Normal"}</span>
+                              <span className="text-gray-500 text-[10px] block">Status:</span>
+                              <span className="text-emerald-400 text-xs font-semibold">{study.status || "READY"}</span>
                             </div>
                             <div>
                               <span className="text-gray-500 text-[10px] block">Age / Sex:</span>
-                              <span className="text-white text-xs">{study.age}y / {study.sex}</span>
+                              <span className="text-white text-xs">{study.id.startsWith("UPLOAD_") || !study.age || study.sex === "N/A" || study.sex === "U" ? "N/A" : `${study.age}y / ${study.sex}`}</span>
                             </div>
                           </div>
                           

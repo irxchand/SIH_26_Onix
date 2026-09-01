@@ -12,6 +12,7 @@ interface RightIntelligenceProps {
   onAccept: () => void;
   onReject: () => void;
   onAnnotationsChanged?: () => void;
+  onAnnotationsChanged?: () => void;
 }
 
 export default function RightIntelligence({ 
@@ -104,7 +105,7 @@ export default function RightIntelligence({
                 <span>True Label: {study.trueLabel || "Normal"}</span>
               </div>
               <div className="text-[9px] text-gray-500 mt-1 flex space-x-3">
-                <span>Age / Sex: {study.age}y / {study.sex}</span>
+                <span>Age / Sex: {study.id.startsWith("UPLOAD_") || !study.age || study.sex === "N/A" || study.sex === "U" ? "N/A" : `${study.age}y / ${study.sex}`}</span>
               </div>
             </div>
           </div>

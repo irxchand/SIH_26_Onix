@@ -19,7 +19,7 @@ To ensure cross-functional contribution across all 4 engineers while maintaining
 - **E4 (10%):** Setup `uv` virtual env, scaffold FastAPI, and define strict Pydantic JSON schemas.
 
 **RISK VALIDATION (Where things go wrong here):**
-- *Risk:* Data Leakage. If E2 normalizes or fits scalars on the whole dataset before splitting, the entire benchmark is invalid.
+- *Risk:* Data Leakage. If E2 normalizes or fits scalars on the whole dataset before splitting, the entire benchmark isupdate invalid.
 - *Agent Validator Hook Check:* Your agent will run a script checking that `StandardScaler` is explicitly fit *after* `train_test_split`.
 
 ### Phase 2: ML Pipeline & Core API (Estimated Time: 8-10 Hours)

@@ -3,7 +3,7 @@ export interface Study {
   patientId: string;
   patientName: string;
   age: number;
-  sex: "M" | "F";
+  sex: "M" | "F" | "U" | "N/A" | string;
   modality: string;
   acquisitionDate: string;
   status: "READY" | "ANALYZING" | "COMPLETE" | "REVIEW";
