@@ -111,17 +111,10 @@ class InformedPrototypeReasoningProvider:
         structured_context["is_known"] = is_known
         structured_context["known_data"] = known_data or {}
 
-        try:
-            res: LLMReasoningOutput = self.llm_provider.analyze(
-                image_path=image_path,
-                context=structured_context
-            )
-        except Exception as e:
-            print(f"[REASONING FALLBACK] CDP/ChatGPT error: {e}. Falling back to structured MockLLMProvider.")
-            res: LLMReasoningOutput = self.mock_provider.analyze(
-                image_path=image_path,
-                context=structured_context
-            )
+        res: LLMReasoningOutput = self.llm_provider.analyze(
+            image_path=image_path,
+            context=structured_context
+        )
 
         # Map to structured evidence items and bounding boxes
         evidence_items = []

@@ -163,9 +163,55 @@ class CDPChatGPTProvider(BaseLLMProvider):
             if assistant_nodes.count() > 0:
                 prev_last_text = assistant_nodes.last.inner_text().strip()
 
-            target_page.fill(prompt_selector, prompt_text)
-            time.sleep(0.3)
-            target_page.press(prompt_selector, "Enter")
+            prompt_input = target_page.locator(prompt_selector).first
+            prompt_input.click()
+            prompt_input.fill(prompt_text)
+            time.sleep(0.4)
+
+            # Click send button
+            send_clicked = False
+            send_btn_selectors = [
+                "button[data-testid='send-button']",
+                "button[aria-label*='Send prompt']",
+                "button[aria-label*='Send message']",
+                "button[aria-label*='Send']",
+                "button[data-testid='composer-speech-button'] + button",
+                "form button:has(svg)"
+            ]
+            for sel in send_btn_selectors:
+                try:
+                    btn = target_page.locator(sel).first
+                    if btn.is_visible() and btn.is_enabled():
+                        btn.click(timeout=2000)
+                        send_clicked = True
+                        print(f"[EDGE CASE REASONING] Clicked send button using selector: {sel}")
+                        break
+                except Exception:
+                    pass
+
+            if not send_clicked:
+                # Fallback JS click
+                try:
+                    js_clicked = target_page.evaluate("""
+                        () => {
+                            const btn = document.querySelector('button[data-testid="send-button"], button[aria-label*="Send"], button:has(svg)');
+                            if (btn && !btn.disabled) {
+                                btn.click();
+                                return true;
+                            }
+                            return false;
+                        }
+                    """)
+                    if js_clicked:
+                        send_clicked = True
+                        print("[EDGE CASE REASONING] Clicked send button via JS evaluation.")
+                except Exception:
+                    pass
+
+            if not send_clicked:
+                print("[EDGE CASE REASONING] Dispatching Enter key to prompt input.")
+                target_page.keyboard.press("Enter")
+
             print("[EDGE CASE REASONING] MESSAGE SENT")
 
             # 3. Fast streaming detection for complete JSON
