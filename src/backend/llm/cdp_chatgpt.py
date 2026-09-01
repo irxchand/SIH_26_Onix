@@ -200,9 +200,19 @@ class CDPChatGPTProvider(BaseLLMProvider):
                 prev_last_text = assistant_nodes.last.inner_text().strip()
 
             print("[EDGE CASE REASONING] PROMPT SUBMISSION START")
-            prompt_input = target_page.locator(prompt_selector).first
-            prompt_input.click()
-            prompt_input.fill(prompt_text)
+            # ProseMirror-compatible text insertion
+            target_page.evaluate("""
+                (text) => {
+                    const el = document.querySelector('div#prompt-textarea, [contenteditable="true"], textarea');
+                    if (!el) return false;
+                    el.focus();
+                    document.execCommand('selectAll', false, null);
+                    document.execCommand('insertText', false, text);
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                }
+            """, prompt_text)
 
             # Event-Driven Send Triggering: wait for send button to be enabled
             send_clicked = False
@@ -211,12 +221,11 @@ class CDPChatGPTProvider(BaseLLMProvider):
                 "button[aria-label*='Send prompt']",
                 "button[aria-label*='Send message']",
                 "button[aria-label*='Send']",
-                "button[data-testid='composer-speech-button'] + button",
-                "form button:has(svg)"
+                ".composer-submit-button-color"
             ]
 
             start_btn_wait = time.time()
-            while time.time() - start_btn_wait < 4.0:
+            while time.time() - start_btn_wait < 5.0:
                 for sel in send_btn_selectors:
                     try:
                         btn = target_page.locator(sel).first
@@ -229,14 +238,12 @@ class CDPChatGPTProvider(BaseLLMProvider):
                         pass
                 if send_clicked:
                     break
-                time.sleep(0.05)
 
-            if not send_clicked:
-                # Fallback JS click
+                # JS click fallback
                 try:
                     js_clicked = target_page.evaluate("""
                         () => {
-                            const btn = document.querySelector('button[data-testid="send-button"], button[aria-label*="Send"], button:has(svg)');
+                            const btn = document.querySelector('button[data-testid="send-button"], button[aria-label*="Send prompt"], button[aria-label*="Send message"], button[aria-label*="Send"]');
                             if (btn && !btn.disabled) {
                                 btn.click();
                                 return true;
@@ -246,9 +253,12 @@ class CDPChatGPTProvider(BaseLLMProvider):
                     """)
                     if js_clicked:
                         send_clicked = True
-                        print("[EDGE CASE REASONING] Clicked send button via JS evaluation.")
+                        print(f"[EDGE CASE REASONING] Clicked send button via JS evaluation (waited {time.time() - start_btn_wait:.2f}s)")
+                        break
                 except Exception:
                     pass
+
+                time.sleep(0.05)
 
             if not send_clicked:
                 print("[EDGE CASE REASONING] Dispatching Enter key to prompt input.")
