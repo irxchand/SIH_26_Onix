@@ -20,6 +20,48 @@ DEDICATED_CHATGPT_URL = os.getenv(
 CDP_ENDPOINT_URL = os.getenv("CDP_ENDPOINT_URL", "http://127.0.0.1:9222")
 
 
+def get_optimized_chatgpt_image(image_path: Path) -> Path:
+    """
+    Downsamples large CXR images (up to 30MB) into a crisp, web-optimized ~1024x1024 JPEG
+    (~100-120KB) and caches it in data/cache/chatgpt_opt/ for ultra-fast browser upload.
+    """
+    cache_dir = Path("data/cache/chatgpt_opt")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    file_stat = image_path.stat()
+    cache_filename = f"{image_path.stem}_{file_stat.st_mtime_ns}_{file_stat.st_size}.jpg"
+    cached_path = cache_dir / cache_filename
+
+    if cached_path.exists() and cached_path.stat().st_size > 0:
+        return cached_path
+
+    try:
+        import cv2
+        img = cv2.imread(str(image_path), cv2.IMREAD_UNCHANGED)
+        if img is None:
+            return image_path
+
+        # Convert 16-bit to 8-bit if needed
+        if img.dtype != "uint8":
+            img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+
+        h, w = img.shape[:2]
+        max_dim = 1024
+        if max(h, w) > max_dim:
+            scale = max_dim / float(max(h, w))
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+        # Save high-quality compressed JPEG (quality 85)
+        cv2.imwrite(str(cached_path), img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        print(f"[EDGE CASE REASONING] Created 120KB optimized CXR: {cached_path.stat().st_size / 1024:.1f} KB (was {file_stat.st_size / (1024*1024):.1f} MB)")
+        return cached_path
+    except Exception as e:
+        print(f"[EDGE CASE REASONING] Optimization fallback warning: {e}")
+        return image_path
+
+
 class CDPChatGPTProvider(BaseLLMProvider):
     """
     Connects directly to your active Google Chrome browser session via CDP
@@ -66,13 +108,16 @@ class CDPChatGPTProvider(BaseLLMProvider):
         if not img_path.exists():
             raise FileNotFoundError(f"Image not found at {img_path}")
 
+        # Optimize image down to ~120KB for near-instant upload
+        upload_img_path = get_optimized_chatgpt_image(img_path)
+
         context["image_path"] = str(img_path)
         prompt_text = self.build_request_prompt(context)
         case_id = context.get("case_id", "UNKNOWN_JUDGE_CASE")
 
         print("==================================================")
         print(f"[EDGE CASE REASONING] CASE ID: {case_id}")
-        print(f"[EDGE CASE REASONING] IMAGE: {img_path.name} ({img_path})")
+        print(f"[EDGE CASE REASONING] ATTACHING: {upload_img_path.name} ({upload_img_path.stat().st_size / 1024:.1f} KB)")
         print(f"[EDGE CASE REASONING] AVAILABLE EVIDENCE: seg={bool(context.get('segmentation'))}, feat={bool(context.get('feature_information'))}, classical={context.get('classical_result')}, quantum={context.get('quantum_result')}")
         print(f"[EDGE CASE REASONING] TRAINING DATA CONTEXT: {context.get('experiment_context', {}).get('training_data_fraction', '10%')}")
         print(f"[EDGE CASE REASONING] CHATGPT TARGET: {self.chat_url}")
@@ -116,20 +161,16 @@ class CDPChatGPTProvider(BaseLLMProvider):
                 target_page = ctx.new_page()
                 target_page.goto(self.chat_url)
                 target_page.wait_for_load_state("domcontentloaded")
-                time.sleep(2.0)
-
-            # Keep execution in the background without stealing focus or popping up the window
 
             print(f"[EDGE CASE REASONING] Connected to tab: {target_page.url}")
 
-            # 1. Attach Actual Image File
+            # 1. Attach Optimized ~120KB Image File
             print("[EDGE CASE REASONING] IMAGE ATTACHMENT START")
             file_input_selector = "input[type='file']"
             try:
                 target_page.wait_for_selector(file_input_selector, timeout=8000, state="attached")
-                target_page.set_input_files(file_input_selector, [str(img_path)])
+                target_page.set_input_files(file_input_selector, [str(upload_img_path)])
                 print("[EDGE CASE REASONING] IMAGE ATTACHED SUCCESSFULLY")
-                time.sleep(1.8)
             except Exception as e:
                 print(f"[EDGE CASE REASONING] Image attachment warning: {e}")
 
@@ -148,27 +189,22 @@ class CDPChatGPTProvider(BaseLLMProvider):
             except Exception:
                 pass
 
-            # 2. Submit Edge-Case Prompt
+            # 2. Submit Edge-Case Prompt (Event-Driven)
             prompt_selector = "div#prompt-textarea, textarea[placeholder*='Message']"
             target_page.wait_for_selector(prompt_selector, timeout=12000)
 
-            # Record assistant messages count before submission
             assistant_selector = "div[data-message-author-role='assistant']"
-            existing_messages = target_page.locator(assistant_selector).count()
-
-            print("[EDGE CASE REASONING] PROMPT SUBMISSION START")
-            # Record last assistant text before sending
             assistant_nodes = target_page.locator(assistant_selector)
             prev_last_text = ""
             if assistant_nodes.count() > 0:
                 prev_last_text = assistant_nodes.last.inner_text().strip()
 
+            print("[EDGE CASE REASONING] PROMPT SUBMISSION START")
             prompt_input = target_page.locator(prompt_selector).first
             prompt_input.click()
             prompt_input.fill(prompt_text)
-            time.sleep(0.4)
 
-            # Click send button
+            # Event-Driven Send Triggering: wait for send button to be enabled
             send_clicked = False
             send_btn_selectors = [
                 "button[data-testid='send-button']",
@@ -178,16 +214,22 @@ class CDPChatGPTProvider(BaseLLMProvider):
                 "button[data-testid='composer-speech-button'] + button",
                 "form button:has(svg)"
             ]
-            for sel in send_btn_selectors:
-                try:
-                    btn = target_page.locator(sel).first
-                    if btn.is_visible() and btn.is_enabled():
-                        btn.click(timeout=2000)
-                        send_clicked = True
-                        print(f"[EDGE CASE REASONING] Clicked send button using selector: {sel}")
-                        break
-                except Exception:
-                    pass
+
+            start_btn_wait = time.time()
+            while time.time() - start_btn_wait < 4.0:
+                for sel in send_btn_selectors:
+                    try:
+                        btn = target_page.locator(sel).first
+                        if btn.is_visible() and btn.is_enabled():
+                            btn.click(timeout=1000)
+                            send_clicked = True
+                            print(f"[EDGE CASE REASONING] Clicked send button: {sel} (waited {time.time() - start_btn_wait:.2f}s)")
+                            break
+                    except Exception:
+                        pass
+                if send_clicked:
+                    break
+                time.sleep(0.05)
 
             if not send_clicked:
                 # Fallback JS click
@@ -214,10 +256,8 @@ class CDPChatGPTProvider(BaseLLMProvider):
 
             print("[EDGE CASE REASONING] MESSAGE SENT")
 
-            # 3. Fast streaming detection for complete JSON
+            # 3. Fast Streaming JSON Detection (100ms polling)
             print("[EDGE CASE REASONING] WAITING FOR CHATGPT RESPONSE...")
-            time.sleep(2.0)
-
             raw_text = ""
             start_poll = time.time()
             max_wait_seconds = 180.0
@@ -227,9 +267,7 @@ class CDPChatGPTProvider(BaseLLMProvider):
                 if assistant_nodes.count() > 0:
                     current_text = assistant_nodes.last.inner_text().strip()
                     
-                    # Ensure this is a new response, not the previous turn
                     if current_text != prev_last_text:
-                        # Check if JSON closing bracket and valid JSON has arrived
                         if "}" in current_text:
                             try:
                                 import re
@@ -242,7 +280,7 @@ class CDPChatGPTProvider(BaseLLMProvider):
                                     break
                             except Exception:
                                 pass
-                time.sleep(0.5)
+                time.sleep(0.1)
 
             if not raw_text:
                 raise TimeoutError("ChatGPT response timed out after 180s without completing valid JSON response.")
