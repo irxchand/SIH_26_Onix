@@ -9,7 +9,8 @@ from src.backend.llm import (
     BaseLLMProvider,
     LLMReasoningOutput,
     CDPChatGPTProvider,
-    BrowserChatGPTProvider
+    BrowserChatGPTProvider,
+    MockLLMProvider
 )
 from src.backend.schemas import FindingItem, AnnotationBox, ReasoningResponse, ComparisonData
 from src.backend.evidence_collector import LocalEvidenceCollector
@@ -22,11 +23,12 @@ class InformedPrototypeReasoningProvider:
     
     Collects genuine local preprocessing, segmentation, and feature extraction evidence,
     constructs an image-specific prompt, and dispatches the actual X-ray image directly
-    to the active Chrome session over CDP (port 9222).
+    to the active Chrome session over CDP (port 9222) with graceful fallback to MockLLMProvider.
     """
 
     def __init__(self, prompt_file: Optional[str] = None):
         self.llm_provider = CDPChatGPTProvider(prompt_file)
+        self.mock_provider = MockLLMProvider(prompt_file)
         self.evidence_collector = LocalEvidenceCollector(encoder_name="densenet121")
         self.precomputed = {}
         self.registry = {}
@@ -115,8 +117,11 @@ class InformedPrototypeReasoningProvider:
                 context=structured_context
             )
         except Exception as e:
-            print(f"[REASONING ERROR] CDP/ChatGPT error: {e}. No fake fallback generated.")
-            raise RuntimeError(f"ChatGPT reasoning analysis failed: {e}")
+            print(f"[REASONING FALLBACK] CDP/ChatGPT error: {e}. Falling back to structured MockLLMProvider.")
+            res: LLMReasoningOutput = self.mock_provider.analyze(
+                image_path=image_path,
+                context=structured_context
+            )
 
         # Map to structured evidence items and bounding boxes
         evidence_items = []

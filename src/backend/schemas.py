@@ -81,6 +81,47 @@ class EvidenceItem(BaseModel):
     note: Optional[str] = None
 
 
+class FindingItem(BaseModel):
+    id: str = "E01"
+    region: str
+    finding: str
+    severity: str = "HIGH"
+    confidence: float = 0.85
+    source: str = "LLM_ASSISTED_PROTOTYPE"
+    signal: Optional[str] = None
+    xPercent: Optional[float] = None
+    yPercent: Optional[float] = None
+    note: Optional[str] = None
+
+
+class AnnotationBox(BaseModel):
+    id: Optional[str] = "E01"
+    x: float
+    y: float
+    width: float
+    height: float
+    label: str
+    confidence: Optional[float] = 0.85
+    color: Optional[str] = "#EF4444"
+
+
+class ComparisonData(BaseModel):
+    classical_prediction: str
+    quantum_prediction: str
+    classical_score: Optional[float] = None
+    quantum_score: Optional[float] = None
+
+
+class ReasoningResponse(BaseModel):
+    overall_assessment: str
+    findings: List[FindingItem]
+    annotations: List[AnnotationBox]
+    comparison: ComparisonData
+    limitations: List[str]
+    disclaimer: str
+    provenance: Optional[str] = "LLM_ASSISTED_PROTOTYPE"
+
+
 class PredictionResponse(BaseModel):
     classical_svm_confidence: float
     quantum_svm_confidence: float
@@ -143,45 +184,4 @@ class StatusRequest(BaseModel):
 
 class ReportRequest(BaseModel):
     prompt: str
-
-
-class FindingItem(BaseModel):
-    id: str = "E01"
-    region: str
-    finding: str
-    severity: str = "HIGH"
-    confidence: float = 0.85
-    source: str = "LLM_ASSISTED_PROTOTYPE"
-    signal: Optional[str] = None
-    xPercent: Optional[float] = None
-    yPercent: Optional[float] = None
-    note: Optional[str] = None
-
-
-class AnnotationBox(BaseModel):
-    id: Optional[str] = "E01"
-    x: float
-    y: float
-    width: float
-    height: float
-    label: str
-    confidence: Optional[float] = 0.85
-    color: Optional[str] = "#EF4444"
-
-
-class ComparisonData(BaseModel):
-    classical_prediction: str
-    quantum_prediction: str
-    classical_score: Optional[float] = None
-    quantum_score: Optional[float] = None
-
-
-class ReasoningResponse(BaseModel):
-    overall_assessment: str
-    findings: List[FindingItem]
-    annotations: List[AnnotationBox]
-    comparison: ComparisonData
-    limitations: List[str]
-    disclaimer: str
-    provenance: Optional[str] = "LLM_ASSISTED_PROTOTYPE"
 

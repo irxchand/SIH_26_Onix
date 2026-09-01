@@ -413,6 +413,7 @@ export default function Home() {
     setLoading(false);
   };
   const handleCustomUpload = async (file: File) => {
+    if (!file) return;
     const formData = new FormData();
     formData.append("file", file);
 
@@ -422,21 +423,28 @@ export default function Home() {
         body: formData,
       });
 
+      const uploadData = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({ detail: "Upload failed" }));
-        setError(errData.detail || "Upload failed");
+        setError(uploadData?.detail || "Upload failed");
         return;
       }
 
       setIsUploadModalOpen(false);
-      // Refresh the queue to include the new study
-      await fetchQueue();
 
-      // Select the newly uploaded study
-      const uploadData = await res.json().catch(() => null);
-      if (uploadData?.studyId) {
-        const newStudy = studies.find(s => s.id === uploadData.studyId);
-        if (newStudy) handleSelectStudy(newStudy);
+      // Fetch queue directly to avoid React async state delay
+      const qRes = await fetch(`${API_BASE}/api/v1/queue?limit=100`);
+      if (qRes.ok) {
+        const qData = await qRes.json();
+        setStudies(qData.studies);
+        if (uploadData?.studyId) {
+          const newStudy = qData.studies.find((s: any) => s.id === uploadData.studyId);
+          if (newStudy) {
+            handleSelectStudy(newStudy);
+          }
+        }
+      } else {
+        await fetchQueue();
       }
     } catch (err) {
       console.error("Upload error:", err);
@@ -1473,16 +1481,21 @@ export default function Home() {
                 <div className="border-2 border-dashed border-gray-700 hover:border-blue-500 rounded-xl p-8 text-center space-y-3 transition-colors bg-gray-900/40 relative cursor-pointer">
                   <input
                     type="file"
-                    onChange={(e) => e.target.files && handleCustomUpload(e.target.files[0])}
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleCustomUpload(e.target.files[0]);
+                        e.target.value = "";
+                      }
+                    }}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept="image/png, image/jpeg, image/jpg, .dcm"
+                    accept="image/*,.dcm,.png,.jpg,.jpeg,.bmp,.webp"
                   />
                   <div className="text-3xl">🫁</div>
                   <div className="text-xs text-gray-300 font-bold">
-                    Drop CXR Image or Click to Browse
+                    Drop CXR Image or Click to Browse from Device
                   </div>
                   <div className="text-[9px] text-gray-500">
-                    Supports PNG, JPEG, DICOM
+                    Supports PNG, JPEG, JPG, DICOM, WebP, BMP
                   </div>
                 </div>
               ) : (

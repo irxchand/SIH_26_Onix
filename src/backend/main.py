@@ -335,7 +335,10 @@ async def get_queue(
 # ---------------------------------------------------------------------------
 # POST /api/v1/upload — upload a CXR image
 # ---------------------------------------------------------------------------
-ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
+ALLOWED_CONTENT_TYPES = {
+    "image/jpeg", "image/png", "image/jpg", "image/pjpeg", "image/x-png",
+    "image/webp", "image/bmp", "application/octet-stream", "application/dicom"
+}
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
@@ -410,11 +413,16 @@ async def upload_image_from_url(payload: UrlUploadRequest):
 
 @app.post("/api/v1/upload", response_model=UploadResponse)
 async def upload_image(file: UploadFile = File(...)):
-    # Validate content type
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
+    filename_lower = (file.filename or "").lower()
+    is_valid_ext = any(filename_lower.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".dcm", ".bmp", ".webp"])
+    is_valid_mime = (
+        file.content_type in ALLOWED_CONTENT_TYPES
+        or (file.content_type and file.content_type.startswith("image/"))
+    )
+    if not (is_valid_mime or is_valid_ext):
         raise HTTPException(
             status_code=415,
-            detail=f"Unsupported file type: {file.content_type}. Only JPEG and PNG are accepted.",
+            detail=f"Unsupported file type: {file.content_type}. Only JPEG, PNG, and standard medical image formats are accepted.",
         )
 
     # Read file and validate size
@@ -424,7 +432,7 @@ async def upload_image(file: UploadFile = File(...)):
 
     # Generate study ID
     study_id = f"XR-UPLOAD-{uuid.uuid4().hex[:8].upper()}"
-    ext = ".jpg" if file.content_type == "image/jpeg" else ".png"
+    ext = ".jpg" if (".jpg" in filename_lower or ".jpeg" in filename_lower or file.content_type == "image/jpeg") else ".png"
     filename = f"{study_id}{ext}"
     filepath = UPLOADS_DIR / filename
 

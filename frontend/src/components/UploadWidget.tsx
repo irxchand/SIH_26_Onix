@@ -37,6 +37,7 @@ export default function UploadWidget({ onFileSelected }: UploadWidgetProps) {
     e.preventDefault();
     if (e.target.files && e.target.files[0]) {
       onFileSelected(e.target.files[0]);
+      e.target.value = "";
     }
   };
 
@@ -56,7 +57,7 @@ export default function UploadWidget({ onFileSelected }: UploadWidgetProps) {
         type="file"
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
         onChange={handleChange}
-        accept="image/jpeg, image/png"
+        accept="image/*,.dcm,.png,.jpg,.jpeg,.bmp,.webp"
       />
 
       <div className="flex flex-col items-center space-y-4 p-8 text-center pointer-events-none">

@@ -85,3 +85,7 @@ Once execution begins, your agent will act as a strict CI/CD gatekeeper. At the 
 8. `pytest tests/phase3_race_conditions.py` — validates concurrent `/status` calls return 200 + 409.
 
 *Only when the agent outputs all green checks will the team proceed to the next phase.*
+
+
+
+*WE NEED A VERY INTERESTING APPROACH FOR THE ACTUAL THING TO GET SELECTED IN THE TOP 5"

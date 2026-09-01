@@ -5,7 +5,10 @@ import time
 import traceback
 from typing import Dict, Any, Optional
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError:
+    sync_playwright = None
 
 from .base import BaseLLMProvider, LLMReasoningOutput
 from src.backend.prompt_builder import build_clinical_reasoning_prompt, build_edge_case_prompt
@@ -75,6 +78,9 @@ class CDPChatGPTProvider(BaseLLMProvider):
         print(f"[EDGE CASE REASONING] CHATGPT TARGET: {self.chat_url}")
         print("==================================================")
 
+        if sync_playwright is None:
+            raise RuntimeError("Playwright is not installed. Please install playwright to use CDPChatGPTProvider.")
+
         with sync_playwright() as p:
             try:
                 browser = p.chromium.connect_over_cdp(self.cdp_url)
@@ -84,7 +90,7 @@ class CDPChatGPTProvider(BaseLLMProvider):
                     f"Make sure Chrome is running with --remote-debugging-port=9222. Details: {e}"
                 )
 
-            # Find matching page by URL
+            # Find matching ChatGPT page by URL
             target_page = None
             for ctx in browser.contexts:
                 for page in ctx.pages:
@@ -95,21 +101,24 @@ class CDPChatGPTProvider(BaseLLMProvider):
                     break
 
             if not target_page:
-                if browser.contexts and browser.contexts[0].pages:
-                    for page in browser.contexts[0].pages:
+                for ctx in browser.contexts:
+                    for page in ctx.pages:
                         if "chatgpt.com" in page.url:
                             target_page = page
                             break
-                if not target_page and browser.contexts and browser.contexts[0].pages:
-                    target_page = browser.contexts[0].pages[0]
+                    if target_page:
+                        break
 
+            # If no ChatGPT tab is open at all, open a new page and navigate to chat_url
             if not target_page:
-                raise RuntimeError("No active ChatGPT tab found in Chrome instance.")
+                print(f"[EDGE CASE REASONING] No active ChatGPT tab found. Opening {self.chat_url}...")
+                ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+                target_page = ctx.new_page()
+                target_page.goto(self.chat_url)
+                target_page.wait_for_load_state("domcontentloaded")
+                time.sleep(2.0)
 
-            try:
-                target_page.bring_to_front()
-            except Exception:
-                pass
+            # Keep execution in the background without stealing focus or popping up the window
 
             print(f"[EDGE CASE REASONING] Connected to tab: {target_page.url}")
 
