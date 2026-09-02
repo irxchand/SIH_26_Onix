@@ -160,22 +160,17 @@ SELECT / UPLOAD  -->  ANATOMICAL GROUNDING --> QUANTUM-CLASSICAL --> EVIDENCE & 
 
 ---
 
-## Slide 8: Technology Stack & Technical Specifications
+---
 
-* **Frontend Client Layer:**
-  * Framework: Next.js 16.3 (Turbopack, React 19, TypeScript)
-  * Styling: TailwindCSS v4 with Medical Dark Mode Palette
-  * Rendering: SVG-based anatomical overlay engine & interactive canvas
-* **Backend Microservice Layer:**
-  * Framework: FastAPI (Python 3.12, Uvicorn asynchronous worker)
-  * Preprocessing & Deep Learning: PyTorch, Torchvision (DenseNet-121), OpenCV
-  * Dimensionality Reduction: Scikit-learn (Principal Component Analysis)
-* **Quantum Computing Layer:**
-  * Framework: Qiskit 2.5, Qiskit Machine Learning
-  * Circuit Architecture: 8-Qubit $ZZ\text{FeatureMap}$ with 2 repetitions
-  * Simulator: Qiskit StatevectorSampler (Hardware-agnostic for IBM Quantum QPU execution)
-* **Reasoning & Synthesis Layer:**
-  * Neuro-symbolic synthesis engine mapping quantum margins to SNOMED-CT radiological terms
+## Slide 8: Problem Statement 3 Deliverables & Compliance Matrix
+
+| S.No | PS3 Deliverable | Required Capabilities / Metrics | Our Implemented Architecture & Status | Compliance |
+|---|---|---|---|:---:|
+| **1** | **Data Pre-processing & Feature Engineering Module** | Data cleaning, normalization, dimensionality reduction, feature selection, handling of missing/noisy data | **U-Net anatomical lung segmentation** (inductive bias removing scanner artifacts) + **DenseNet-121 multi-scale feature extractor** (1024-dim) + **StandardScaler normalization** + **8-dim PCA** capturing >90% variance. | **100% Complete** |
+| **2** | **Hybrid Quantum-Classical Architecture** | Classical front-end and Quantum processing unit (QPU/simulator), Data encoding | **Next.js 16 Client + FastAPI Python Server** + **Qiskit StatevectorSampler QPU runtime**. Real-time parameterized data encoding via $ZZ\text{FeatureMap}$, $Z\text{FeatureMap}$, and $RealAmplitudes$ circuits. | **100% Complete** |
+| **3** | **Quantum Machine Learning Models** | Variational Quantum Classifier (VQC), Quantum SVM, Quantum Neural Network or equivalent, Parameterized quantum circuits | **Fidelity Quantum Kernel QSVM** ($ZZ\text{FeatureMap}$ 8-qubit, 2-rep entangled state space) + **RealAmplitudes VQC ansatz** + **Z-Map baseline**. Benchmarked head-to-head against classical RBF-SVM. | **100% Complete** |
+| **4** | **Prediction & Decision Support Module** | Disease probability scores, Early risk stratification, Threshold tuning for sensitivity/specificity | **Continuous probability outputs**, calibrated threshold ($-0.0885$), **Level-C Clinical Reasoning synthesis** with SNOMED-CT mapped bounding boxes and radiologic narrative. | **100% Complete** |
+| **5** | **Software Platform / End-to-End Prototype** | User interface or API, Dataset upload, Model training & evaluation dashboard, Result visualization | **Next.js 16 Clinical Workstation** on `localhost:3000`, drag-and-drop DICOM/CXR upload, live 4-circuit architecture gallery, OpenQASM 2.0 inspector, and REST APIs on `localhost:8000`. | **100% Complete** |
 
 ---
 
@@ -214,7 +209,26 @@ SELECT / UPLOAD  -->  ANATOMICAL GROUNDING --> QUANTUM-CLASSICAL --> EVIDENCE & 
 
 ---
 
-## Slide 10: Team Capabilities & Conclusion
+## Slide 10: Technology Stack & Technical Specifications
+
+* **Frontend Client Layer:**
+  * Framework: Next.js 16.3 (Turbopack, React 19, TypeScript)
+  * Styling: TailwindCSS v4 with Medical Dark Mode Palette
+  * Rendering: SVG-based anatomical overlay engine & interactive canvas
+* **Backend Microservice Layer:**
+  * Framework: FastAPI (Python 3.12, Uvicorn asynchronous worker)
+  * Preprocessing & Deep Learning: PyTorch, Torchvision (DenseNet-121), OpenCV
+  * Dimensionality Reduction: Scikit-learn (Principal Component Analysis)
+* **Quantum Computing Layer:**
+  * Framework: Qiskit 2.5, Qiskit Machine Learning
+  * Circuit Architecture: 8-Qubit $ZZ\text{FeatureMap}$ with 2 repetitions
+  * Simulator: Qiskit StatevectorSampler (Hardware-agnostic for IBM Quantum QPU execution)
+* **Reasoning & Synthesis Layer:**
+  * Neuro-symbolic synthesis engine mapping quantum margins to SNOMED-CT radiological terms
+
+---
+
+## Slide 11: Team Capabilities & Conclusion
 
 ### Why Team Onix Can Deliver
 * **Domain Synergy:** Blended expertise across Quantum Information Science, Medical Computer Vision, Full-Stack System Architecture, and HealthTech Compliance.

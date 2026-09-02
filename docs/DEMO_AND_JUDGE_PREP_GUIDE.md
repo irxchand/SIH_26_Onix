@@ -123,3 +123,18 @@ Before opening your screen to judges, verify these 3 services are active:
 - [x] **Next.js Frontend:** Running on `http://localhost:3000` (`npm run dev`)
 - [x] **Quantum Circuit API:** `http://localhost:8000/api/v1/quantum/circuit/ascii` returning 200 OK
 - [x] **Chrome CDP Stream:** Active on port 9222 with ChatGPT reasoning tab open
+
+---
+
+## 🎯 6. Problem Statement 3 Deliverables & Proof Points
+
+Use this table if a judge asks: *"How does your solution directly address the required deliverables in Problem Statement 3?"*
+
+| S.No | PS3 Deliverable | Required Capability | Where to Show It in Our Live System |
+|---|---|---|---|
+| **1** | **Data Pre-processing & Feature Engineering Module** | Data cleaning, normalization, dimensionality reduction, feature selection, handling of missing/noisy data | **Stage 2 Panel:** U-Net segmentation mask eliminating non-pulmonary noise + DenseNet-121 1024-dim multiscale deep features + StandardScaler normalization + 8-dim PCA compression capturing $>90\%$ variance. |
+| **2** | **Hybrid Quantum-Classical Architecture** | Classical front-end and Quantum processing unit (QPU/simulator), Data encoding | **Next.js Workstation + FastAPI Backend + Qiskit StatevectorSampler.** Real-time parameterized data encoding with $ZZ\text{FeatureMap}$ (2 repetitions, linear/full entanglement) and $Z\text{FeatureMap}$. |
+| **3** | **Quantum Machine Learning Models** | Variational Quantum Classifier (VQC), Quantum SVM, Quantum Neural Network or equivalent, Parameterized quantum circuits | **Stage 3 Quantum Register:** Live 4-circuit gallery (`ZZ-Linear QSVM`, `ZZ-Full`, `Z-Map Baseline`, and `RealAmplitudes VQC Ansatz`) with live OpenQASM 2.0 kernel exports. |
+| **4** | **Prediction & Decision Support Module** | Disease probability scores, Early risk stratification, Threshold tuning for sensitivity/specificity | **Stage 4 & 5 Panels:** Continuous dual probability scores, calibrated threshold ($-0.0885$), Level-C Clinical Reasoning synthesis with SNOMED-CT mapped bounding boxes and radiologic narrative. |
+| **5** | **Software Platform / End-to-End Prototype** | User interface or API, Dataset upload, Model training & evaluation dashboard, Result visualization | **End-to-End System:** Full workstation on `localhost:3000`, live drag-and-drop DICOM upload, real-time quantum telemetry, and automated API endpoints on `localhost:8000`. |
+
