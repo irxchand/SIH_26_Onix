@@ -11,10 +11,28 @@ interface QuantumCircuitViewProps {
   };
 }
 
+const DEFAULT_CIRCUIT_ASCII = `     ┌───┐┌─────────────┐                                                          
+q_0: ┤ H ├┤ P(2.0*x[0]) ├──■───────────────────────────────────────────────────────
+     ├───┤├─────────────┤┌─┴─┐┌───────────────────┐┌───┐                          
+q_1: ┤ H ├┤ P(2.0*x[1]) ├┤ X ├┤ P(2.0*x[0]*x[1]) ├┤ X ├──■─────────────────────────
+     ├───┤├─────────────┤└───┘└───────────────────┘└─┬─┘┌─┴─┐┌───────────────────┐
+q_2: ┤ H ├┤ P(2.0*x[2]) ├────────────────────────────┼──┤ X ├┤ P(2.0*x[1]*x[2]) ├
+     ├───┤├─────────────┤                            │  └───┘└───────────────────┘
+q_3: ┤ H ├┤ P(2.0*x[3]) ├────────────────────────────┼─────────────────────────────
+     ├───┤├─────────────┤                            │                             
+q_4: ┤ H ├┤ P(2.0*x[4]) ├────────────────────────────┼─────────────────────────────
+     ├───┤├─────────────┤                            │                             
+q_5: ┤ H ├┤ P(2.0*x[5]) ├────────────────────────────┼─────────────────────────────
+     ├───┤├─────────────┤                            │                             
+q_6: ┤ H ├┤ P(2.0*x[6]) ├────────────────────────────┼─────────────────────────────
+     ├───┤├─────────────┤                            │                             
+q_7: ┤ H ├┤ P(2.0*x[7]) ├────────────────────────────■─────────────────────────────
+     └───┘└─────────────┘                                                          `;
+
 export default function QuantumCircuitView({ isAnimating, metrics }: QuantumCircuitViewProps) {
   const [activeStep, setActiveStep] = useState(-1);
   const [qasm, setQasm] = useState<string | null>(null);
-  const [ascii, setAscii] = useState<string | null>(null);
+  const [ascii, setAscii] = useState<string>(DEFAULT_CIRCUIT_ASCII);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -31,7 +49,7 @@ export default function QuantumCircuitView({ isAnimating, metrics }: QuantumCirc
     return () => clearInterval(timer);
   }, [isAnimating]);
 
-  // Fetch QASM & ASCII once on mount
+  // Fetch QASM & ASCII from backend
   useEffect(() => {
     fetch("http://localhost:8000/api/v1/quantum/circuit/ascii")
       .then(res => res.json())
@@ -39,7 +57,9 @@ export default function QuantumCircuitView({ isAnimating, metrics }: QuantumCirc
         if (data.qasm) setQasm(data.qasm);
         if (data.ascii) setAscii(data.ascii);
       })
-      .catch(err => console.error("Failed to fetch quantum circuit:", err));
+      .catch(() => {
+        // Fallback already set by default
+      });
   }, []);
 
 
